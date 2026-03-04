@@ -11,16 +11,15 @@ function hashPin(pin: string): string {
 }
 
 function generateSlug(name: string): string {
-  return (
-    name
-      .toLowerCase()
-      .replace(/[^a-z0-9\s-]/g, "")
-      .replace(/\s+/g, "-")
-      .replace(/-+/g, "-")
-      .trim() +
-    "-" +
-    Date.now().toString(36)
-  )
+  const base = name
+    .toLowerCase()
+    .replace(/[^a-z0-9\s-]/g, "")
+    .replace(/\s+/g, "-")
+    .replace(/-+/g, "-")
+    .trim()
+  // Short 4-char random suffix to avoid collisions, keeps the URL clean
+  const suffix = Math.random().toString(36).substring(2, 6)
+  return `${base}-${suffix}`
 }
 
 function generatePin(): string {
