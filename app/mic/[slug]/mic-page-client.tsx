@@ -206,7 +206,7 @@ export function MicPageClient({ slug }: { slug: string }) {
           <Link href="/" className="flex items-center gap-2 group">
             <Mic2 className="h-8 w-8 text-primary" />
             <span className="text-2xl font-bold tracking-tight text-foreground">
-              Mic<span className="text-primary">List</span>
+              Mic<span className="text-primary">Drop</span>
             </span>
           </Link>
           <div className="flex items-center gap-2">

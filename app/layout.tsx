@@ -8,7 +8,7 @@ const spaceGrotesk = Space_Grotesk({ subsets: ["latin"] });
 const spaceMono = Space_Mono({ weight: ["400", "700"], subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: 'MicList - Open Mic Signup',
+  title: 'Mic Drop - Open Mic Signup',
   description: 'Sign up for standup comedy open mics. No apps. No drama. Just slots.',
   generator: 'v0.app',
   icons: {

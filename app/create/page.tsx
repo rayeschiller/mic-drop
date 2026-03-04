@@ -3,7 +3,7 @@ import { Mic2, ArrowLeft } from "lucide-react"
 import { CreateMicForm } from "@/components/create-mic-form"
 
 export const metadata = {
-  title: "Create a Mic | MicList",
+  title: "Create a Mic | Mic Drop",
   description: "Host your own open mic. Set the date, pick the slots, share the link.",
 }
 
@@ -16,7 +16,7 @@ export default function CreateMicPage() {
           <Link href="/" className="flex items-center gap-2 group">
             <Mic2 className="h-8 w-8 text-neon-pink" />
             <span className="text-2xl font-bold tracking-tight">
-              Mic<span className="text-neon-pink">List</span>
+              Mic<span className="text-neon-pink">Drop</span>
             </span>
           </Link>
         </div>

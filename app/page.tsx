@@ -11,7 +11,7 @@ export default function HomePage() {
           <Link href="/" className="flex items-center gap-2 group">
             <Mic2 className="h-8 w-8 text-neon-pink" />
             <span className="text-2xl font-bold tracking-tight">
-              Mic<span className="text-neon-pink">List</span>
+              Mic<span className="text-neon-pink">Drop</span>
             </span>
           </Link>
           <Link href="/create">
@@ -126,7 +126,7 @@ export default function HomePage() {
           <div className="flex flex-col items-center justify-between gap-4 md:flex-row">
             <div className="flex items-center gap-2">
               <Mic2 className="h-5 w-5 text-neon-pink" />
-              <span className="font-bold">MicList</span>
+              <span className="font-bold">Mic Drop</span>
             </div>
             <p className="text-sm text-muted-foreground">
               Built for comedians who just want to do their time.
