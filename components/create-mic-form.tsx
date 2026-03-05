@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Sparkles, Check, X, Loader2 } from "lucide-react"
 import { createMic, checkSlugAvailability } from "@/app/actions"
+import { ImageUpload } from "@/components/image-upload"
 
 function toSlug(value: string): string {
   return value
@@ -36,6 +37,7 @@ export function CreateMicForm() {
     notes: "",
     hostEmail: "",
   })
+  const [imageUrl, setImageUrl] = useState<string | null>(null)
 
   const [slug, setSlug] = useState("")
   const [slugManuallyEdited, setSlugManuallyEdited] = useState(false)
@@ -83,7 +85,7 @@ export function CreateMicForm() {
     setIsSubmitting(true)
     setSubmitError(null)
 
-    const result = await createMic({ ...formData, slug: slug || undefined, hostEmail: formData.hostEmail || undefined })
+    const result = await createMic({ ...formData, slug: slug || undefined, hostEmail: formData.hostEmail || undefined, imageUrl: imageUrl || undefined })
 
     if (!result.success || !result.slug || !result.hostPin) {
       setSubmitError(result.error || "Something went wrong. Try again.")
@@ -187,6 +189,12 @@ export function CreateMicForm() {
             <>This becomes the link you share: <code className="text-foreground">/{slug || "your-mic-name"}</code>. Auto-filled from the mic name but you can customize it.</>
           )}
         </p>
+      </div>
+
+      <div className="space-y-2">
+        <Label className="text-lg font-bold">Flyer / Image</Label>
+        <ImageUpload value={imageUrl} onChange={setImageUrl} />
+        <p className="text-sm text-muted-foreground">Optional. Shows at the top of your mic page.</p>
       </div>
 
       <div className="space-y-2">

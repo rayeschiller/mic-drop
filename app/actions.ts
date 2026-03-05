@@ -39,6 +39,7 @@ export interface MicData {
   endTime: string
   totalSlots: number
   notes: string | null
+  imageUrl: string | null
   slots: SlotData[]
 }
 
@@ -69,6 +70,7 @@ export async function createMic(formData: {
   notes: string
   slug?: string
   hostEmail?: string
+  imageUrl?: string
 }): Promise<{ success: boolean; slug?: string; hostPin?: string; error?: string }> {
   const admin = createAdminClient()
   const slug = formData.slug?.trim() || generateSlug(formData.name)
@@ -82,6 +84,7 @@ export async function createMic(formData: {
       slug,
       host_pin_hash: hostPinHash,
       host_email: formData.hostEmail || null,
+      image_url: formData.imageUrl || null,
       name: formData.name,
       venue: formData.venue,
       date: formData.date,
@@ -163,6 +166,7 @@ export async function getMic(slug: string): Promise<{ mic: MicData | null; error
       endTime: mic.end_time,
       totalSlots: mic.total_slots,
       notes: mic.notes,
+      imageUrl: mic.image_url,
       slots: (slots || []).map((s) => ({
         id: s.id,
         number: s.slot_number,
@@ -326,6 +330,7 @@ export async function getMicWithEmails(
       endTime: mic.end_time,
       totalSlots: mic.total_slots,
       notes: mic.notes,
+      imageUrl: mic.image_url,
       slots: (slots || []).map((s) => ({
         id: s.id,
         number: s.slot_number,
@@ -387,6 +392,7 @@ export async function hostUpdateMic(
     notes?: string
     totalSlots: number
     slug?: string
+    imageUrl?: string | null
   }
 ): Promise<{ success: boolean; newSlug?: string; error?: string }> {
   const verified = await verifyHostPin(micSlug, pin)
@@ -416,6 +422,7 @@ export async function hostUpdateMic(
       end_time: data.endTime || null,
       notes: data.notes || null,
       total_slots: data.totalSlots,
+      image_url: data.imageUrl ?? undefined,
     })
     .eq("id", mic.id)
 

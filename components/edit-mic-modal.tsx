@@ -14,6 +14,7 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Pencil, Check, X, Loader2 } from "lucide-react"
 import { checkSlugAvailability } from "@/app/actions"
+import { ImageUpload } from "@/components/image-upload"
 
 function toSlug(value: string): string {
   return value
@@ -35,6 +36,7 @@ interface MicEditData {
   notes?: string
   totalSlots: number
   slug: string
+  imageUrl?: string | null
 }
 
 interface EditMicModalProps {
@@ -170,6 +172,14 @@ export function EditMicModal({
                 <>Your mic lives at <code>/{formData.slug}</code></>
               )}
             </p>
+          </div>
+
+          <div className="space-y-2">
+            <Label className="text-foreground font-medium">Flyer / Image</Label>
+            <ImageUpload
+              value={formData.imageUrl ?? null}
+              onChange={(url) => setFormData({ ...formData, imageUrl: url })}
+            />
           </div>
 
           <div className="space-y-2">

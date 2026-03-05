@@ -284,7 +284,18 @@ export function MicPageClient({ slug }: { slug: string }) {
 
       <div className="mx-auto max-w-3xl px-6 py-12">
         {/* Mic Header - Show Flyer Style */}
-        <div className="relative overflow-hidden rounded-2xl border-2 border-primary bg-card p-8 md:p-12 mb-8">
+        <div className="relative overflow-hidden rounded-2xl border-2 border-primary bg-card mb-8">
+          {mic.imageUrl && (
+            <div className="relative w-full h-64 md:h-80">
+              <img
+                src={mic.imageUrl}
+                alt={mic.name}
+                className="w-full h-full object-cover"
+              />
+              <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-card" />
+            </div>
+          )}
+          <div className={`relative p-8 md:p-12 ${mic.imageUrl ? "pt-4 md:pt-6" : ""}`}>
           <div className="absolute -right-12 -top-12 h-24 w-24 rotate-45 bg-primary opacity-80" />
           <div className="absolute -left-8 -bottom-8 h-16 w-16 rounded-full bg-accent/30 blur-2xl" />
 
@@ -341,6 +352,7 @@ export function MicPageClient({ slug }: { slug: string }) {
                 </Markdown>
               </div>
             )}
+          </div>
           </div>
         </div>
 
@@ -484,6 +496,7 @@ export function MicPageClient({ slug }: { slug: string }) {
             endTime: mic.endTime,
             notes: mic.notes || undefined,
             totalSlots: mic.totalSlots,
+            imageUrl: mic.imageUrl,
           }}
           currentFilledSlots={filledSlots}
           onSave={handleEditSave}
