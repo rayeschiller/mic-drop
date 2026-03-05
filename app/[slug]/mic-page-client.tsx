@@ -324,7 +324,7 @@ export function MicPageClient({ slug }: { slug: string }) {
 
             {mic.notes && (
               <div className="mt-8 border-l-4 border-primary/50 pl-4">
-                <p className="text-muted-foreground italic">{mic.notes}</p>
+                <p className="text-muted-foreground italic whitespace-pre-wrap">{mic.notes}</p>
               </div>
             )}
           </div>
