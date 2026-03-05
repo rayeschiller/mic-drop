@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 import {
   Dialog,
   DialogContent,
@@ -12,7 +12,19 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
-import { Pencil } from "lucide-react"
+import { Pencil, Check, X, Loader2 } from "lucide-react"
+import { checkSlugAvailability } from "@/app/actions"
+
+function toSlug(value: string): string {
+  return value
+    .toLowerCase()
+    .replace(/[^a-z0-9\s-]/g, "")
+    .replace(/\s+/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-|-$/g, "")
+}
+
+type SlugStatus = "idle" | "checking" | "available" | "taken" | "invalid" | "unchanged"
 
 interface MicEditData {
   name: string
@@ -22,6 +34,7 @@ interface MicEditData {
   endTime: string
   notes?: string
   totalSlots: number
+  slug: string
 }
 
 interface EditMicModalProps {
@@ -40,16 +53,51 @@ export function EditMicModal({
   onSave,
 }: EditMicModalProps) {
   const [formData, setFormData] = useState<MicEditData>(micData)
+  const [slugStatus, setSlugStatus] = useState<SlugStatus>("unchanged")
+  const checkTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const handleOpenChange = (newOpen: boolean) => {
     if (newOpen) {
       setFormData(micData)
+      setSlugStatus("unchanged")
     }
     onOpenChange(newOpen)
   }
 
+  const checkSlug = useCallback((value: string, originalSlug: string) => {
+    if (checkTimeoutRef.current) clearTimeout(checkTimeoutRef.current)
+
+    if (value === originalSlug) {
+      setSlugStatus("unchanged")
+      return
+    }
+    if (value.length < 3) {
+      setSlugStatus("invalid")
+      return
+    }
+
+    setSlugStatus("checking")
+    checkTimeoutRef.current = setTimeout(async () => {
+      const { available } = await checkSlugAvailability(value)
+      setSlugStatus(available ? "available" : "taken")
+    }, 500)
+  }, [])
+
+  const handleSlugChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const sanitized = toSlug(e.target.value)
+    setFormData((prev) => ({ ...prev, slug: sanitized }))
+    checkSlug(sanitized, micData.slug)
+  }
+
+  // Reset when micData changes (modal re-opened with fresh data)
+  useEffect(() => {
+    setFormData(micData)
+    setSlugStatus("unchanged")
+  }, [micData])
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
+    if (slugStatus === "taken" || slugStatus === "invalid") return
     onSave(formData)
     onOpenChange(false)
   }
@@ -81,6 +129,47 @@ export function EditMicModal({
               required
               className="border-border bg-secondary/50 focus:border-primary"
             />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="edit-slug" className="text-foreground font-medium">
+              Page URL
+            </Label>
+            <div className="relative">
+              <div className="flex items-center rounded-md border border-border bg-secondary/50 focus-within:border-primary overflow-hidden h-10">
+                <input
+                  id="edit-slug"
+                  value={formData.slug}
+                  onChange={handleSlugChange}
+                  className="flex-1 h-full bg-transparent text-sm outline-none px-3 pr-10"
+                />
+                <div className="absolute right-3 flex items-center">
+                  {slugStatus === "checking" && (
+                    <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                  )}
+                  {slugStatus === "available" && (
+                    <Check className="h-4 w-4 text-neon-green" />
+                  )}
+                  {slugStatus === "taken" && (
+                    <X className="h-4 w-4 text-destructive" />
+                  )}
+                </div>
+              </div>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              {slugStatus === "taken" && (
+                <span className="text-destructive">That URL is already taken.</span>
+              )}
+              {slugStatus === "invalid" && (
+                <span className="text-destructive">Must be at least 3 characters.</span>
+              )}
+              {slugStatus === "available" && (
+                <span className="text-neon-green">Available — page will move to /{formData.slug}</span>
+              )}
+              {(slugStatus === "unchanged" || slugStatus === "idle") && (
+                <>Your mic lives at <code>/{formData.slug}</code></>
+              )}
+            </p>
           </div>
 
           <div className="space-y-2">
@@ -131,9 +220,8 @@ export function EditMicModal({
               <Input
                 id="edit-endTime"
                 type="time"
-                value={formData.endTime}
+                value={formData.endTime ?? ""}
                 onChange={(e) => setFormData({ ...formData, endTime: e.target.value })}
-                required
                 className="border-border bg-secondary/50 focus:border-primary"
               />
             </div>
@@ -188,6 +276,7 @@ export function EditMicModal({
             </Button>
             <Button
               type="submit"
+              disabled={slugStatus === "taken" || slugStatus === "invalid"}
               className="flex-1 bg-primary text-primary-foreground hover:bg-primary/90"
             >
               Save Changes

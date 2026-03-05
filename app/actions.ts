@@ -2,6 +2,7 @@
 
 import { createAdminClient } from "@/lib/supabase/admin"
 import { createClient } from "@/lib/supabase/server"
+import { sendHostPinEmail } from "@/lib/email"
 import crypto from "crypto"
 
 // --- Helpers ---
@@ -52,6 +53,12 @@ export interface SlotData {
 
 // --- Actions ---
 
+export async function checkSlugAvailability(slug: string): Promise<{ available: boolean }> {
+  const admin = createAdminClient()
+  const { data } = await admin.from("mics").select("id").eq("slug", slug).maybeSingle()
+  return { available: !data }
+}
+
 export async function createMic(formData: {
   name: string
   venue: string
@@ -60,9 +67,11 @@ export async function createMic(formData: {
   endTime: string
   slots: number
   notes: string
+  slug?: string
+  hostEmail?: string
 }): Promise<{ success: boolean; slug?: string; hostPin?: string; error?: string }> {
   const admin = createAdminClient()
-  const slug = generateSlug(formData.name)
+  const slug = formData.slug?.trim() || generateSlug(formData.name)
   const hostPin = generatePin()
   const hostPinHash = hashPin(hostPin)
 
@@ -72,11 +81,12 @@ export async function createMic(formData: {
     .insert({
       slug,
       host_pin_hash: hostPinHash,
+      host_email: formData.hostEmail || null,
       name: formData.name,
       venue: formData.venue,
       date: formData.date,
       start_time: formData.startTime,
-      end_time: formData.endTime,
+      end_time: formData.endTime || null,
       total_slots: formData.slots,
       notes: formData.notes || null,
     })
@@ -85,6 +95,10 @@ export async function createMic(formData: {
 
   if (micError || !mic) {
     console.error("Failed to create mic:", micError)
+    // Postgres unique constraint violation
+    if (micError?.code === "23505") {
+      return { success: false, error: "That URL is already taken. Try a different one." }
+    }
     return { success: false, error: "Failed to create mic" }
   }
 
@@ -100,6 +114,16 @@ export async function createMic(formData: {
   if (slotsError) {
     console.error("Failed to create slots:", slotsError)
     return { success: false, error: "Failed to create slots" }
+  }
+
+  // Send host PIN email if provided (non-blocking — don't fail the request if email fails)
+  if (formData.hostEmail) {
+    sendHostPinEmail({
+      to: formData.hostEmail,
+      micName: formData.name,
+      micSlug: slug,
+      hostPin,
+    }).catch((err) => console.error("Failed to send host PIN email:", err))
   }
 
   return { success: true, slug, hostPin }
@@ -362,8 +386,9 @@ export async function hostUpdateMic(
     endTime: string
     notes?: string
     totalSlots: number
+    slug?: string
   }
-): Promise<{ success: boolean; error?: string }> {
+): Promise<{ success: boolean; newSlug?: string; error?: string }> {
   const verified = await verifyHostPin(micSlug, pin)
   if (!verified.success) return { success: false, error: "Unauthorized" }
 
@@ -377,15 +402,18 @@ export async function hostUpdateMic(
 
   if (!mic) return { success: false, error: "Mic not found" }
 
+  const newSlug = data.slug?.trim() || micSlug
+
   // Update mic details
   const { error: updateError } = await admin
     .from("mics")
     .update({
+      slug: newSlug,
       name: data.name,
       venue: data.venue,
       date: data.date,
       start_time: data.startTime,
-      end_time: data.endTime,
+      end_time: data.endTime || null,
       notes: data.notes || null,
       total_slots: data.totalSlots,
     })
@@ -393,6 +421,9 @@ export async function hostUpdateMic(
 
   if (updateError) {
     console.error("Failed to update mic:", updateError)
+    if (updateError.code === "23505") {
+      return { success: false, error: "That URL is already taken. Try a different one." }
+    }
     return { success: false, error: "Failed to update" }
   }
 
@@ -418,5 +449,5 @@ export async function hostUpdateMic(
       .eq("taken", false)
   }
 
-  return { success: true }
+  return { success: true, newSlug: newSlug !== micSlug ? newSlug : undefined }
 }

@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
+import { useRouter } from "next/navigation"
 import Link from "next/link"
 import {
   Mic2,
@@ -52,6 +53,7 @@ function formatTime(timeString: string): string {
 }
 
 export function MicPageClient({ slug }: { slug: string }) {
+  const router = useRouter()
   const [mic, setMic] = useState<MicData | null>(null)
   const [selectedSlot, setSelectedSlot] = useState<number | null>(null)
   const [modalOpen, setModalOpen] = useState(false)
@@ -144,11 +146,16 @@ export function MicPageClient({ slug }: { slug: string }) {
     endTime: string
     notes?: string
     totalSlots: number
+    slug: string
   }) => {
     if (!hostPin) return
     const result = await hostUpdateMic(slug, hostPin, data)
     if (result.success) {
-      await loadMic()
+      if (result.newSlug) {
+        router.push(`/${result.newSlug}`)
+      } else {
+        await loadMic()
+      }
     }
   }
 
@@ -287,24 +294,24 @@ export function MicPageClient({ slug }: { slug: string }) {
 
             <div className="mt-8 flex flex-col gap-3 text-foreground">
               <div className="flex items-center gap-3">
-                <MapPin className="h-5 w-5 text-neon-amber flex-shrink-0" />
+                <MapPin className="h-5 w-5 text-white flex-shrink-0" />
                 <span className="text-lg">{mic.venue}</span>
               </div>
 
               <div className="flex items-center gap-3">
-                <CalendarDays className="h-5 w-5 text-neon-amber flex-shrink-0" />
+                <CalendarDays className="h-5 w-5 text-white flex-shrink-0" />
                 <span className="text-lg">{formatDate(mic.date)}</span>
               </div>
 
               <div className="flex items-center gap-3">
-                <Clock className="h-5 w-5 text-neon-amber flex-shrink-0" />
+                <Clock className="h-5 w-5 text-white flex-shrink-0" />
                 <span className="text-lg">
-                  {formatTime(mic.startTime)} - {formatTime(mic.endTime)}
+                  {formatTime(mic.startTime)}{mic.endTime ? ` - ${formatTime(mic.endTime)}` : ""}
                 </span>
               </div>
 
               <div className="flex items-center gap-3">
-                <Users className="h-5 w-5 text-neon-amber flex-shrink-0" />
+                <Users className="h-5 w-5 text-white flex-shrink-0" />
                 <span
                   className={`text-lg font-bold ${isFull ? "text-destructive" : "text-accent"}`}
                 >
@@ -455,6 +462,7 @@ export function MicPageClient({ slug }: { slug: string }) {
           open={editModalOpen}
           onOpenChange={setEditModalOpen}
           micData={{
+            slug: mic.slug,
             name: mic.name,
             venue: mic.venue,
             date: mic.date,

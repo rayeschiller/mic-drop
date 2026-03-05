@@ -23,7 +23,7 @@ export function MicCard({ mic }: MicCardProps) {
   const isFull = availableSlots === 0
 
   return (
-    <Link href={`/mic/${mic.slug}`} className="block group">
+    <Link href={`/${mic.slug}`} className="block group">
       <article className="relative overflow-hidden rounded-lg border-2 border-border bg-card p-6 transition-all duration-300 hover:border-neon-pink hover:shadow-[0_0_30px_rgba(236,72,153,0.3)]">
         {/* Show flyer style corner accent */}
         <div className="absolute -right-8 -top-8 h-16 w-16 rotate-45 bg-neon-pink opacity-80" />
