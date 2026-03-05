@@ -263,6 +263,9 @@ export function EditMicModal({
               onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
               className="min-h-20 border-border bg-secondary/50 focus:border-primary"
             />
+            <p className="text-xs text-muted-foreground">
+              Supports markdown — <code>**bold**</code>, <code>[link text](https://url.com)</code>, etc.
+            </p>
           </div>
 
           <div className="flex gap-3 pt-2">

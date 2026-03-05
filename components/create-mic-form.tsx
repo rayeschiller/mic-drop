@@ -299,6 +299,9 @@ export function CreateMicForm() {
           onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
           className="min-h-24 border-border bg-secondary/50 focus:border-neon-pink placeholder:text-muted-foreground/50"
         />
+        <p className="text-sm text-muted-foreground">
+          Supports markdown — <code>**bold**</code>, <code>[link text](https://url.com)</code>, etc.
+        </p>
       </div>
 
       {submitError && (

@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
+import Markdown from "react-markdown"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
 import {
@@ -323,8 +324,21 @@ export function MicPageClient({ slug }: { slug: string }) {
             </div>
 
             {mic.notes && (
-              <div className="mt-8 border-l-4 border-primary/50 pl-4">
-                <p className="text-muted-foreground italic whitespace-pre-wrap">{mic.notes}</p>
+              <div className="mt-8 prose prose-invert prose-sm max-w-none">
+                <Markdown
+                  components={{
+                    a: ({ href, children }) => (
+                      <a href={href} target="_blank" rel="noopener noreferrer" className="text-primary underline hover:text-primary/80">
+                        {children}
+                      </a>
+                    ),
+                    p: ({ children }) => (
+                      <p className="text-foreground whitespace-pre-wrap mb-2 last:mb-0">{children}</p>
+                    ),
+                  }}
+                >
+                  {mic.notes}
+                </Markdown>
               </div>
             )}
           </div>
