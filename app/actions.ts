@@ -54,6 +54,25 @@ export interface SlotData {
 
 // --- Actions ---
 
+export async function uploadMicImage(formData: FormData): Promise<{ url?: string; error?: string }> {
+  const admin = createAdminClient()
+  const file = formData.get("file") as File
+  if (!file) return { error: "No file provided" }
+
+  const ext = file.name.split(".").pop()
+  const path = `${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`
+  const buffer = new Uint8Array(await file.arrayBuffer())
+
+  const { error } = await admin.storage
+    .from("mic_image")
+    .upload(path, buffer, { contentType: file.type, upsert: false })
+
+  if (error) return { error: error.message }
+
+  const { data } = admin.storage.from("mic_image").getPublicUrl(path)
+  return { url: data.publicUrl }
+}
+
 export async function checkSlugAvailability(slug: string): Promise<{ available: boolean }> {
   const admin = createAdminClient()
   const { data } = await admin.from("mics").select("id").eq("slug", slug).maybeSingle()

@@ -1,8 +1,8 @@
 "use client"
 
 import { useRef, useState } from "react"
-import { createClient } from "@/lib/supabase/client"
 import { ImageIcon, Loader2, X, Upload } from "lucide-react"
+import { uploadMicImage } from "@/app/actions"
 
 interface ImageUploadProps {
   value: string | null
@@ -27,22 +27,17 @@ export function ImageUpload({ value, onChange }: ImageUploadProps) {
     setUploading(true)
     setError(null)
 
-    const supabase = createClient()
-    const ext = file.name.split(".").pop()
-    const path = `${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`
+    const formData = new FormData()
+    formData.append("file", file)
+    const result = await uploadMicImage(formData)
 
-    const { error: uploadError } = await supabase.storage
-      .from("mic_image")
-      .upload(path, file, { upsert: false })
-
-    if (uploadError) {
-      setError("Upload failed. Try again.")
+    if (result.error || !result.url) {
+      setError(result.error ?? "Upload failed. Try again.")
       setUploading(false)
       return
     }
 
-    const { data } = supabase.storage.from("mic_image").getPublicUrl(path)
-    onChange(data.publicUrl)
+    onChange(result.url)
     setUploading(false)
   }
 
@@ -63,15 +58,15 @@ export function ImageUpload({ value, onChange }: ImageUploadProps) {
         <img
           src={value}
           alt="Mic flyer"
-          className="w-full h-48 object-cover"
+          className="w-full h-auto object-contain"
         />
         <button
           type="button"
           onClick={handleRemove}
-          className="absolute top-2 right-2 flex items-center gap-1 rounded-full bg-black/70 px-3 py-1.5 text-xs text-white opacity-0 group-hover:opacity-100 transition-opacity hover:bg-black/90"
+          className="absolute top-2 right-2 flex items-center gap-1.5 rounded-full bg-black/70 px-3 py-1.5 text-xs font-medium text-white hover:bg-black/90 transition-colors"
         >
           <X className="h-3 w-3" />
-          Remove
+          Remove image
         </button>
       </div>
     )
@@ -106,12 +101,8 @@ export function ImageUpload({ value, onChange }: ImageUploadProps) {
               <ImageIcon className="h-6 w-6 text-neon-pink" />
             </div>
             <div className="text-center">
-              <p className="text-sm font-medium text-foreground">
-                Drop your flyer here
-              </p>
-              <p className="text-xs text-muted-foreground mt-1">
-                or click to browse · PNG, JPG, GIF up to 5MB
-              </p>
+              <p className="text-sm font-medium text-foreground">Drop your flyer here</p>
+              <p className="text-xs text-muted-foreground mt-1">or click to browse · PNG, JPG, GIF up to 5MB</p>
             </div>
             <div className="flex items-center gap-1.5 rounded-full border border-border px-3 py-1 text-xs text-muted-foreground">
               <Upload className="h-3 w-3" />
