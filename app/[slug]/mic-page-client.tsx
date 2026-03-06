@@ -17,6 +17,7 @@ import {
   Mail,
   Trash2,
   ShieldCheck,
+  CalendarPlus,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { SignupModal } from "@/components/signup-modal"
@@ -43,6 +44,41 @@ function formatDate(dateString: string): string {
     day: "numeric",
     year: "numeric",
   })
+}
+
+function toICSDate(date: string, time: string): string {
+  const [year, month, day] = date.split("-")
+  const [hour, minute] = time.split(":")
+  return `${year}${month}${day}T${hour}${minute}00`
+}
+
+function downloadICS(mic: { name: string; venue: string; date: string; startTime: string; endTime: string | null; notes: string | null; slug: string }) {
+  const start = toICSDate(mic.date, mic.startTime)
+  const end = mic.endTime ? toICSDate(mic.date, mic.endTime) : toICSDate(mic.date, mic.startTime)
+  const url = `${window.location.origin}/${mic.slug}`
+  const description = mic.notes ? mic.notes.replace(/\n/g, "\\n") : ""
+
+  const ics = [
+    "BEGIN:VCALENDAR",
+    "VERSION:2.0",
+    "PRODID:-//Mic Drop//EN",
+    "BEGIN:VEVENT",
+    `SUMMARY:${mic.name}`,
+    `LOCATION:${mic.venue}`,
+    `DTSTART:${start}`,
+    `DTEND:${end}`,
+    `DESCRIPTION:${description}\\n\\nSign up: ${url}`,
+    `URL:${url}`,
+    "END:VEVENT",
+    "END:VCALENDAR",
+  ].join("\r\n")
+
+  const blob = new Blob([ics], { type: "text/calendar" })
+  const link = document.createElement("a")
+  link.href = URL.createObjectURL(blob)
+  link.download = `${mic.name.toLowerCase().replace(/\s+/g, "-")}.ics`
+  link.click()
+  URL.revokeObjectURL(link.href)
 }
 
 function formatTime(timeString: string): string {
@@ -353,6 +389,16 @@ export function MicPageClient({ slug }: { slug: string }) {
                       </Markdown>
                     </div>
                   )}
+
+                  <div className="mt-8">
+                    <button
+                      onClick={() => downloadICS(mic)}
+                      className="inline-flex items-center gap-2 rounded-full border border-border px-4 py-2 text-sm text-muted-foreground hover:border-neon-green hover:text-neon-green transition-colors"
+                    >
+                      <CalendarPlus className="h-4 w-4" />
+                      Add to calendar
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
