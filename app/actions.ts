@@ -441,7 +441,7 @@ export async function hostUpdateMic(
       end_time: data.endTime || null,
       notes: data.notes || null,
       total_slots: data.totalSlots,
-      image_url: data.imageUrl ?? undefined,
+      image_url: data.imageUrl !== undefined ? data.imageUrl : undefined,
     })
     .eq("id", mic.id)
 
