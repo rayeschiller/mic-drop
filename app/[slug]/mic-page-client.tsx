@@ -282,79 +282,83 @@ export function MicPageClient({ slug }: { slug: string }) {
         </div>
       )}
 
-      <div className="mx-auto max-w-3xl px-6 py-12">
-        {/* Mic Header - Show Flyer Style */}
-        <div className="relative overflow-hidden rounded-2xl border-2 border-primary bg-card mb-8">
+      <div className={`mx-auto px-6 py-12 ${mic.imageUrl ? "max-w-5xl" : "max-w-3xl"}`}>
+        <div className={mic.imageUrl ? "flex flex-col md:grid md:grid-cols-[1fr_300px] gap-8 items-start" : ""}>
+
+          {/* Mobile image — above content */}
           {mic.imageUrl && (
             <img
               src={mic.imageUrl}
               alt={mic.name}
-              className="w-full h-auto object-contain"
+              className="md:hidden w-full rounded-2xl object-cover"
             />
           )}
-          <div className="relative p-8 md:p-12">
-          <div className="absolute -right-12 -top-12 h-24 w-24 rotate-45 bg-primary opacity-80" />
-          <div className="absolute -left-8 -bottom-8 h-16 w-16 rounded-full bg-accent/30 blur-2xl" />
 
-          <div className="relative">
-            <h1 className="text-4xl font-bold tracking-tight md:text-6xl text-balance text-foreground">
-              {mic.name}
-            </h1>
+          {/* Main content column */}
+          <div>
+            {/* Mic Header */}
+            <div className="relative overflow-hidden rounded-2xl border-2 border-primary bg-card mb-8">
+              <div className="relative p-8 md:p-12">
+                <div className="absolute -right-12 -top-12 h-24 w-24 rotate-45 bg-primary opacity-80" />
+                <div className="absolute -left-8 -bottom-8 h-16 w-16 rounded-full bg-accent/30 blur-2xl" />
 
-            <div className="mt-8 flex flex-col gap-3 text-foreground">
-              <div className="flex items-center gap-3">
-                <MapPin className="h-5 w-5 text-white flex-shrink-0" />
-                <span className="text-lg">{mic.venue}</span>
-              </div>
+                <div className="relative">
+                  <h1 className="text-4xl font-bold tracking-tight md:text-6xl text-balance text-foreground">
+                    {mic.name}
+                  </h1>
 
-              <div className="flex items-center gap-3">
-                <CalendarDays className="h-5 w-5 text-white flex-shrink-0" />
-                <span className="text-lg">{formatDate(mic.date)}</span>
-              </div>
+                  <div className="mt-8 flex flex-col gap-3 text-foreground">
+                    <div className="flex items-center gap-3">
+                      <MapPin className="h-5 w-5 text-white flex-shrink-0" />
+                      <span className="text-lg">{mic.venue}</span>
+                    </div>
 
-              <div className="flex items-center gap-3">
-                <Clock className="h-5 w-5 text-white flex-shrink-0" />
-                <span className="text-lg">
-                  {formatTime(mic.startTime)}{mic.endTime ? ` - ${formatTime(mic.endTime)}` : ""}
-                </span>
-              </div>
+                    <div className="flex items-center gap-3">
+                      <CalendarDays className="h-5 w-5 text-white flex-shrink-0" />
+                      <span className="text-lg">{formatDate(mic.date)}</span>
+                    </div>
 
-              <div className="flex items-center gap-3">
-                <Users className="h-5 w-5 text-white flex-shrink-0" />
-                <span
-                  className={`text-lg font-bold ${isFull ? "text-destructive" : "text-accent"}`}
-                >
-                  {isFull
-                    ? "Congrats, this mic is emotionally unavailable."
-                    : `${availableSlotsCount} of ${mic.totalSlots} slots left`}
-                </span>
+                    <div className="flex items-center gap-3">
+                      <Clock className="h-5 w-5 text-white flex-shrink-0" />
+                      <span className="text-lg">
+                        {formatTime(mic.startTime)}{mic.endTime ? ` - ${formatTime(mic.endTime)}` : ""}
+                      </span>
+                    </div>
+
+                    <div className="flex items-center gap-3">
+                      <Users className="h-5 w-5 text-white flex-shrink-0" />
+                      <span className={`text-lg font-bold ${isFull ? "text-destructive" : "text-accent"}`}>
+                        {isFull
+                          ? "Congrats, this mic is emotionally unavailable."
+                          : `${availableSlotsCount} of ${mic.totalSlots} slots left`}
+                      </span>
+                    </div>
+                  </div>
+
+                  {mic.notes && (
+                    <div className="mt-8 prose prose-invert prose-sm max-w-none">
+                      <Markdown
+                        components={{
+                          a: ({ href, children }) => (
+                            <a href={href} target="_blank" rel="noopener noreferrer" className="text-primary underline hover:text-primary/80">
+                              {children}
+                            </a>
+                          ),
+                          p: ({ children }) => (
+                            <p className="text-foreground whitespace-pre-wrap mb-2 last:mb-0">{children}</p>
+                          ),
+                        }}
+                      >
+                        {mic.notes}
+                      </Markdown>
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
 
-            {mic.notes && (
-              <div className="mt-8 prose prose-invert prose-sm max-w-none">
-                <Markdown
-                  components={{
-                    a: ({ href, children }) => (
-                      <a href={href} target="_blank" rel="noopener noreferrer" className="text-primary underline hover:text-primary/80">
-                        {children}
-                      </a>
-                    ),
-                    p: ({ children }) => (
-                      <p className="text-foreground whitespace-pre-wrap mb-2 last:mb-0">{children}</p>
-                    ),
-                  }}
-                >
-                  {mic.notes}
-                </Markdown>
-              </div>
-            )}
-          </div>
-          </div>
-        </div>
-
-        {/* Slot List */}
-        <div className="space-y-4">
+            {/* Slot List */}
+            <div className="space-y-4">
           <div className="flex items-center justify-between">
             <h2 className="text-xl font-bold text-foreground">Lineup</h2>
             {!isFull && (
@@ -452,7 +456,21 @@ export function MicPageClient({ slug }: { slug: string }) {
               </p>
             </div>
           )}
-        </div>
+          </div>{/* end slot list */}
+          </div>{/* end main content column */}
+
+          {/* Desktop sticky image */}
+          {mic.imageUrl && (
+            <div className="hidden md:block sticky top-6">
+              <img
+                src={mic.imageUrl}
+                alt={mic.name}
+                className="w-full rounded-2xl object-cover shadow-2xl"
+              />
+            </div>
+          )}
+
+        </div>{/* end grid */}
       </div>
 
       {/* Signup Modal */}
