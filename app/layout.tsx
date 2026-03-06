@@ -11,6 +11,17 @@ export const metadata: Metadata = {
   title: 'Mic Drop - Open Mic Signup',
   description: 'Sign up for standup comedy open mics. No apps. No drama. Just slots.',
   generator: 'v0.app',
+  openGraph: {
+    title: 'Mic Drop',
+    description: 'Sign up for standup comedy open mics. No apps. No drama. Just slots.',
+    images: [{ url: '/icon.svg' }],
+  },
+  twitter: {
+    card: 'summary',
+    title: 'Mic Drop',
+    description: 'Sign up for standup comedy open mics. No apps. No drama. Just slots.',
+    images: ['/icon.svg'],
+  },
   icons: {
     icon: [
       {
