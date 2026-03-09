@@ -72,6 +72,13 @@ export async function getAllMics() {
   })
 }
 
+export async function deleteMic(slug: string): Promise<{ success: boolean; error?: string }> {
+  const admin = createAdminClient()
+  const { error } = await admin.from("mics").delete().eq("slug", slug)
+  if (error) return { success: false, error: error.message }
+  return { success: true }
+}
+
 export async function getAdminMicDetail(slug: string) {
   const admin = createAdminClient()
 
