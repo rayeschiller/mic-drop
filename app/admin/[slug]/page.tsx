@@ -1,7 +1,8 @@
 import Link from "next/link"
 import { notFound, redirect } from "next/navigation"
-import { Mic2, ArrowLeft, MapPin, CalendarDays, Clock, Mail, Instagram, Trash2 } from "lucide-react"
-import { getAdminMicDetail, checkAdminAuth, deleteMic } from "../actions"
+import { Mic2, ArrowLeft, MapPin, CalendarDays, Clock, Mail, Instagram } from "lucide-react"
+import { getAdminMicDetail, checkAdminAuth } from "../actions"
+import { DeleteMicButton } from "./delete-button"
 
 function formatDate(dateString: string): string {
   const date = new Date(dateString + "T00:00:00")
@@ -59,24 +60,7 @@ export default async function AdminMicPage({ params }: { params: Promise<{ slug:
               >
                 View public page →
               </Link>
-              <form
-                action={async () => {
-                  "use server"
-                  await deleteMic(mic.slug)
-                  redirect("/admin")
-                }}
-              >
-                <button
-                  type="submit"
-                  className="flex items-center gap-1.5 rounded-lg border border-destructive/50 px-3 py-1.5 text-xs text-destructive hover:bg-destructive/10 transition-colors"
-                  onClick={(e) => {
-                    if (!confirm(`Delete "${mic.name}"? This cannot be undone.`)) e.preventDefault()
-                  }}
-                >
-                  <Trash2 className="h-3.5 w-3.5" />
-                  Delete mic
-                </button>
-              </form>
+              <DeleteMicButton slug={mic.slug} name={mic.name} />
             </div>
           </div>
 
