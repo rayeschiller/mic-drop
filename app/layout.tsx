@@ -52,8 +52,24 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body className={`font-sans antialiased min-h-screen`}>
-        {children}
+      <body className={`font-sans antialiased min-h-screen flex flex-col`}>
+        <div className="flex-1">{children}</div>
+        <footer className="border-t border-border py-6 px-6 text-center text-sm text-muted-foreground">
+          <p>
+            Built with love by{" "}
+            <span className="text-foreground font-medium">Raye Schiller</span>
+            {" — "}Mic Drop is free and always will be.{" "}
+            <a
+              href="https://account.venmo.com/u/raye-schiller"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-neon-pink hover:underline font-medium"
+            >
+              Buy me a coffee ($5)
+            </a>{" "}
+            if it saved you time or made your night a little smoother. ☕
+          </p>
+        </footer>
         <Analytics />
       </body>
     </html>

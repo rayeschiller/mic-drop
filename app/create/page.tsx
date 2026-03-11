@@ -22,7 +22,7 @@ export default function CreateMicPage() {
         </div>
       </header>
 
-      <div className="mx-auto max-w-xl px-6 py-12">
+      <div className="mx-auto max-w-3xl px-6 py-12">
         <Link
           href="/"
           className="inline-flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors mb-8"
