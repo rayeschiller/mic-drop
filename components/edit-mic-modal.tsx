@@ -479,7 +479,7 @@ export function EditMicModal({
               <div>
                 <span className="text-sm font-bold">Send reminder emails</span>
                 <p className="text-xs text-muted-foreground mt-0.5">
-                  Automatically email everyone on the lineup ~6 hours before showtime.
+                  Automatically email everyone on the lineup the day of the show at 7am EST / 4am PST.
                 </p>
               </div>
             </label>
