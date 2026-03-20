@@ -10,6 +10,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { Sparkles, Check, X, Loader2, Plus, Trash2, RepeatIcon } from "lucide-react"
 import { createMic, checkSlugAvailability } from "@/app/actions"
 import { ImageUpload } from "@/components/image-upload"
+import { SignupReleasePicker } from "@/components/signup-release-picker"
 
 type RecurringFrequency = "weekly" | "biweekly" | "monthly"
 
@@ -74,6 +75,8 @@ export function CreateMicForm() {
   const [createdCount, setCreatedCount] = useState(0)
   const [sections, setSections] = useState<SectionFormData[]>(emptySections())
   const [imageUrl, setImageUrl] = useState<string | null>(null)
+  const [signupOpensAt, setSignupOpensAt] = useState<string | null>(null)
+  const [sendReminders, setSendReminders] = useState(true)
 
   const [slug, setSlug] = useState("")
   const [slugManuallyEdited, setSlugManuallyEdited] = useState(false)
@@ -168,6 +171,8 @@ export function CreateMicForm() {
       seriesName,
       hostPin: sharedPin,
       sections: sectionPayload,
+      signupOpensAt: signupOpensAt || undefined,
+      sendReminders,
     })
 
     if (!result.success || !result.slug || !result.hostPin) {
@@ -191,6 +196,8 @@ export function CreateMicForm() {
           seriesName,
           hostPin: sharedPin,
           sections: sectionPayload,
+          signupOpensAt: signupOpensAt || undefined,
+          sendReminders,
         })
         if (extra.success) count++
       }
@@ -524,6 +531,28 @@ export function CreateMicForm() {
         <p className="text-sm text-muted-foreground">
           Supports markdown — <code>**bold**</code>, <code>[link text](https://url.com)</code>, etc.
         </p>
+      </div>
+
+      <SignupReleasePicker
+        value={signupOpensAt}
+        onChange={setSignupOpensAt}
+      />
+
+      <div className="rounded-xl border border-border/50 bg-secondary/10 p-4">
+        <label className="flex items-center gap-3 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={sendReminders}
+            onChange={(e) => setSendReminders(e.target.checked)}
+            className="h-4 w-4 accent-neon-pink"
+          />
+          <div>
+            <span className="font-bold text-base">Send 6-hour reminder emails</span>
+            <p className="text-sm text-muted-foreground mt-0.5">
+              Automatically email everyone on the lineup ~6 hours before showtime.
+            </p>
+          </div>
+        </label>
       </div>
 
       {submitError && (

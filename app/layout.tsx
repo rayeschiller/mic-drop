@@ -2,6 +2,8 @@ import React from "react"
 import type { Metadata, Viewport } from 'next'
 import { Space_Grotesk, Space_Mono } from 'next/font/google'
 import { Analytics } from '@vercel/analytics/next'
+import { ThemeProvider } from '@/components/theme-provider'
+import { ThemeToggle } from '@/components/theme-toggle'
 import './globals.css'
 
 const spaceGrotesk = Space_Grotesk({ subsets: ["latin"] });
@@ -51,26 +53,31 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <body className={`font-sans antialiased min-h-screen flex flex-col`}>
-        <div className="flex-1">{children}</div>
-        <footer className="border-t border-border py-6 px-6 text-center text-sm text-muted-foreground">
-          <p>
-            Built with love by{" "}
-            <span className="text-foreground font-medium">Raye Schiller</span>
-            {" — "}Mic Drop is free and always will be.{" "}
-            <a
-              href="https://account.venmo.com/u/raye-schiller"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-neon-pink hover:underline font-medium"
-            >
-              Buy me a coffee ($5)
-            </a>{" "}
-            if it saved you time or made your night a little smoother. ☕
-          </p>
-        </footer>
-        <Analytics />
+        <ThemeProvider attribute="class" defaultTheme="dark" enableSystem={false}>
+          <div className="flex-1">{children}</div>
+          <footer className="border-t border-border py-6 px-6 text-sm text-muted-foreground">
+            <div className="mx-auto max-w-5xl flex flex-col sm:flex-row items-center justify-between gap-3">
+              <p className="text-center sm:text-left">
+                Built with love by{" "}
+                <span className="text-foreground font-medium">Raye Schiller</span>
+                {" — "}Mic Drop is free and always will be.{" "}
+                <a
+                  href="https://account.venmo.com/u/raye-schiller"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-neon-pink hover:underline font-medium"
+                >
+                  Buy me a coffee ($5)
+                </a>{" "}
+                if it saved you time or made your night a little smoother. ☕
+              </p>
+              <ThemeToggle />
+            </div>
+          </footer>
+          <Analytics />
+        </ThemeProvider>
       </body>
     </html>
   )

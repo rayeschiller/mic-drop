@@ -63,6 +63,8 @@ export interface MicData {
   sections: SectionData[] // empty for legacy mics
   seriesSlug: string | null
   seriesName: string | null
+  signupOpensAt: string | null
+  sendReminders: boolean
 }
 
 export interface SectionInput {
@@ -112,6 +114,8 @@ export async function createMic(formData: {
   seriesSlug?: string
   seriesName?: string
   hostPin?: string  // pass to share a PIN across recurring instances
+  signupOpensAt?: string | null
+  sendReminders?: boolean
 }): Promise<{ success: boolean; slug?: string; hostPin?: string; error?: string }> {
   const admin = createAdminClient()
   const slug = formData.slug?.trim() || generateSlug(formData.name)
@@ -138,6 +142,8 @@ export async function createMic(formData: {
       notes: formData.notes || null,
       series_slug: formData.seriesSlug || null,
       series_name: formData.seriesName || null,
+      signup_opens_at: formData.signupOpensAt || null,
+      send_reminders: formData.sendReminders ?? false,
     })
     .select("id")
     .single()
@@ -256,6 +262,8 @@ function buildMicData(
     sections: sectionData,
     seriesSlug: mic.series_slug as string | null,
     seriesName: mic.series_name as string | null,
+    signupOpensAt: mic.signup_opens_at as string | null,
+    sendReminders: (mic.send_reminders as boolean) ?? false,
   }
 }
 
@@ -497,6 +505,8 @@ export async function hostUpdateMic(
     totalSlots?: number
     // Multi-section mics:
     sections?: SectionInput[]
+    signupOpensAt?: string | null
+    sendReminders?: boolean
   }
 ): Promise<{ success: boolean; newSlug?: string; error?: string }> {
   const verified = await verifyHostPin(micSlug, pin)
@@ -539,6 +549,8 @@ export async function hostUpdateMic(
       image_url: data.imageUrl !== undefined ? data.imageUrl : undefined,
       series_slug: data.seriesSlug !== undefined ? data.seriesSlug : undefined,
       series_name: data.seriesName !== undefined ? data.seriesName : undefined,
+      signup_opens_at: data.signupOpensAt !== undefined ? data.signupOpensAt : undefined,
+      send_reminders: data.sendReminders !== undefined ? data.sendReminders : undefined,
     })
     .eq("id", mic.id)
 
@@ -695,12 +707,12 @@ async function updateSections(
 export async function getMicsBySeries(
   seriesSlug: string,
   currentMicId: string
-): Promise<{ id: string; slug: string; name: string; date: string; startTime: string }[]> {
+): Promise<{ id: string; slug: string; name: string; date: string; startTime: string; signupOpensAt: string | null }[]> {
   const admin = createAdminClient()
 
   const { data } = await admin
     .from("mics")
-    .select("id, slug, name, date, start_time")
+    .select("id, slug, name, date, start_time, signup_opens_at")
     .eq("series_slug", seriesSlug)
     .neq("id", currentMicId)
     .order("date", { ascending: true })
@@ -711,5 +723,6 @@ export async function getMicsBySeries(
     name: m.name,
     date: m.date,
     startTime: m.start_time,
+    signupOpensAt: m.signup_opens_at,
   }))
 }

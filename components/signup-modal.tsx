@@ -98,7 +98,7 @@ export function SignupModal({
 
           <div className="space-y-2">
             <Label htmlFor="email" className="text-foreground font-medium">
-              Email
+              Email <span className="text-neon-pink">*</span>
             </Label>
             <Input
               id="email"
@@ -106,6 +106,7 @@ export function SignupModal({
               placeholder="you@email.com"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
+              required
               className="border-border bg-secondary/50 focus:border-neon-pink focus:ring-neon-pink"
             />
             <p className="text-xs text-muted-foreground">
@@ -124,7 +125,7 @@ export function SignupModal({
             </Button>
             <Button
               type="submit"
-              disabled={!name.trim() || isSubmitting}
+              disabled={!name.trim() || !email.trim() || isSubmitting}
               className="bg-neon-pink text-primary-foreground hover:bg-neon-pink/90 font-bold"
             >
               {isSubmitting ? "Signing Up..." : "Lock It In"}

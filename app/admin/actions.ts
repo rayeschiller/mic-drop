@@ -48,13 +48,13 @@ export async function getAllMics() {
 
   if (error || !mics) return []
 
-  const { data: slots } = await admin
+  const { data: takenSlots } = await admin
     .from("slots")
-    .select("mic_id, taken")
+    .select("mic_id")
+    .eq("taken", true)
 
   return mics.map((mic) => {
-    const micSlots = (slots ?? []).filter((s) => s.mic_id === mic.id)
-    const filledSlots = micSlots.filter((s) => s.taken).length
+    const filledSlots = (takenSlots ?? []).filter((s) => s.mic_id === mic.id).length
     return {
       id: mic.id,
       slug: mic.slug,

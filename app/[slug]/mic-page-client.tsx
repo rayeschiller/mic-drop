@@ -19,6 +19,7 @@ import {
   ShieldCheck,
   CalendarPlus,
   ChevronRight,
+  Timer,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { SignupModal } from "@/components/signup-modal"
@@ -102,10 +103,34 @@ function formatTime(timeString: string): string {
   return `${hour12}:${minutes} ${ampm}`
 }
 
+function formatCountdown(ms: number): string {
+  const totalSeconds = Math.floor(ms / 1000)
+  const days = Math.floor(totalSeconds / 86400)
+  const hours = Math.floor((totalSeconds % 86400) / 3600)
+  const minutes = Math.floor((totalSeconds % 3600) / 60)
+  const seconds = totalSeconds % 60
+  const pad = (n: number) => String(n).padStart(2, "0")
+  if (days > 0) return `${days}d ${pad(hours)}h ${pad(minutes)}m ${pad(seconds)}s`
+  if (hours > 0) return `${pad(hours)}h ${pad(minutes)}m ${pad(seconds)}s`
+  return `${pad(minutes)}m ${pad(seconds)}s`
+}
+
+function formatLocalOpenTime(utcISO: string): string {
+  return new Intl.DateTimeFormat("en-US", {
+    weekday: "long",
+    month: "long",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+    timeZoneName: "short",
+  }).format(new Date(utcISO))
+}
+
 function SlotRow({
   slot,
   displayNumber,
   isHost,
+  locked,
   onTake,
   onRemove,
   onHostRemove,
@@ -113,6 +138,7 @@ function SlotRow({
   slot: SlotData
   displayNumber: number
   isHost: boolean
+  locked: boolean
   onTake: () => void
   onRemove: () => void
   onHostRemove: () => void
@@ -123,6 +149,8 @@ function SlotRow({
         className={`flex items-center justify-between rounded-xl border px-4 py-3 transition-all duration-200 ${
           slot.taken
             ? "border-border bg-card"
+            : locked
+            ? "border-dashed border-border/30 bg-card/30 opacity-60"
             : "border-dashed border-border/50 bg-card/50 hover:border-primary/50 hover:bg-card"
         } ${isHost && slot.taken ? "rounded-b-none" : ""}`}
       >
@@ -147,12 +175,18 @@ function SlotRow({
               )}
             </div>
           ) : (
-            <button
-              onClick={onTake}
-              className="text-muted-foreground hover:text-accent font-medium transition-colors cursor-pointer"
-            >
-              Sign up for this slot
-            </button>
+            locked ? (
+              <span className="text-muted-foreground/40 font-medium select-none">
+                Opens soon
+              </span>
+            ) : (
+              <button
+                onClick={onTake}
+                className="text-muted-foreground hover:text-accent font-medium transition-colors cursor-pointer"
+              >
+                Sign up for this slot
+              </button>
+            )
           )}
         </div>
 
@@ -205,7 +239,11 @@ export function MicPageClient({ slug }: { slug: string }) {
   const [editModalOpen, setEditModalOpen] = useState(false)
 
   // Series / other dates
-  const [otherDates, setOtherDates] = useState<{ id: string; slug: string; name: string; date: string; startTime: string }[]>([])
+  const [otherDates, setOtherDates] = useState<{ id: string; slug: string; name: string; date: string; startTime: string; signupOpensAt: string | null }[]>([])
+
+  // Signup release countdown
+  const [isLocked, setIsLocked] = useState(false)
+  const [timeLeft, setTimeLeft] = useState(0)
 
   const loadMic = useCallback(async () => {
     if (isHost && hostPin) {
@@ -229,6 +267,34 @@ export function MicPageClient({ slug }: { slug: string }) {
       setOtherDates([])
     }
   }, [mic?.seriesSlug, mic?.id])
+
+  // Signup release countdown
+  useEffect(() => {
+    if (!mic?.signupOpensAt) {
+      setIsLocked(false)
+      return
+    }
+    const opensAt = new Date(mic.signupOpensAt)
+    const remaining = opensAt.getTime() - Date.now()
+    if (remaining <= 0) {
+      setIsLocked(false)
+      return
+    }
+    setIsLocked(true)
+    setTimeLeft(remaining)
+
+    const interval = setInterval(() => {
+      const rem = opensAt.getTime() - Date.now()
+      if (rem <= 0) {
+        setIsLocked(false)
+        setTimeLeft(0)
+        clearInterval(interval)
+      } else {
+        setTimeLeft(rem)
+      }
+    }, 1000)
+    return () => clearInterval(interval)
+  }, [mic?.signupOpensAt])
 
   const handleTakeSlot = (slotNumber: number, displayNumber: number) => {
     setSelectedSlot({ number: slotNumber, displayNumber })
@@ -296,6 +362,8 @@ export function MicPageClient({ slug }: { slug: string }) {
     seriesSlug?: string | null
     seriesName?: string | null
     sections?: SectionInput[]
+    signupOpensAt?: string | null
+    sendReminders?: boolean
   }) => {
     if (!hostPin) return
     const result = await hostUpdateMic(slug, hostPin, data)
@@ -534,6 +602,22 @@ export function MicPageClient({ slug }: { slug: string }) {
 
             {/* Slot List */}
             <div className="space-y-4">
+              {/* Signup release countdown */}
+              {isLocked && mic.signupOpensAt && (
+                <div className="mb-6 rounded-xl border border-neon-amber/40 bg-neon-amber/10 p-5 text-center">
+                  <div className="flex items-center justify-center gap-2 mb-2 text-neon-amber">
+                    <Timer className="h-5 w-5" />
+                    <span className="font-semibold text-sm uppercase tracking-wide">Signups not open yet</span>
+                  </div>
+                  <p className="text-foreground font-medium">
+                    Opens {formatLocalOpenTime(mic.signupOpensAt)}
+                  </p>
+                  <p className="mt-2 font-mono text-2xl font-bold text-neon-amber tracking-widest">
+                    {formatCountdown(timeLeft)}
+                  </p>
+                </div>
+              )}
+
               <div className="flex items-center justify-between">
                 <h2 className="text-xl font-bold text-foreground">Lineup</h2>
                 {!isFull && (
@@ -551,6 +635,7 @@ export function MicPageClient({ slug }: { slug: string }) {
                       key={section.id}
                       section={section}
                       isHost={isHost}
+                      locked={isLocked}
                       onTakeSlot={handleTakeSlot}
                       onRemoveSlot={handleRemoveSlot}
                       onHostRemove={handleHostRemove}
@@ -566,6 +651,7 @@ export function MicPageClient({ slug }: { slug: string }) {
                       slot={slot}
                       displayNumber={slot.number}
                       isHost={isHost}
+                      locked={isLocked}
                       onTake={() => handleTakeSlot(slot.number, slot.number)}
                       onRemove={() => handleRemoveSlot(slot, slot.number)}
                       onHostRemove={() => handleHostRemove(slot.number)}
@@ -597,21 +683,31 @@ export function MicPageClient({ slug }: { slug: string }) {
                   {mic.seriesName ? `Other ${mic.seriesName} Dates` : "Other Dates"}
                 </h2>
                 <div className="rounded-xl border border-border overflow-hidden">
-                  {otherDates.map((d, idx) => (
-                    <Link
-                      key={d.id}
-                      href={`/${d.slug}`}
-                      className={`flex items-center justify-between px-4 py-3 hover:bg-secondary/30 transition-colors ${
-                        idx < otherDates.length - 1 ? "border-b border-border" : ""
-                      }`}
-                    >
-                      <div>
-                        <p className="font-medium text-foreground text-sm">{formatDateShort(d.date)}</p>
-                        <p className="text-xs text-muted-foreground">{formatTime(d.startTime)}</p>
-                      </div>
-                      <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                    </Link>
-                  ))}
+                  {otherDates.map((d, idx) => {
+                    const dateLocked = !!d.signupOpensAt && new Date(d.signupOpensAt) > new Date()
+                    return (
+                      <Link
+                        key={d.id}
+                        href={`/${d.slug}`}
+                        className={`flex items-center justify-between px-4 py-3 transition-colors ${
+                          idx < otherDates.length - 1 ? "border-b border-border" : ""
+                        } ${dateLocked ? "opacity-60" : "hover:bg-secondary/30"}`}
+                      >
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <p className="font-medium text-foreground text-sm">{formatDateShort(d.date)}</p>
+                            {dateLocked && <Lock className="h-3 w-3 text-muted-foreground" />}
+                          </div>
+                          <p className="text-xs text-muted-foreground">
+                            {dateLocked
+                              ? `Signups open ${new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit", timeZoneName: "short" }).format(new Date(d.signupOpensAt!))}`
+                              : formatTime(d.startTime)}
+                          </p>
+                        </div>
+                        <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                      </Link>
+                    )
+                  })}
                 </div>
               </div>
             )}
@@ -674,6 +770,8 @@ export function MicPageClient({ slug }: { slug: string }) {
             sections: mic.sections.length > 0 ? mic.sections : undefined,
             seriesSlug: mic.seriesSlug,
             seriesName: mic.seriesName,
+            signupOpensAt: mic.signupOpensAt,
+            sendReminders: mic.sendReminders,
           }}
           currentFilledSlots={filledSlots}
           onSave={handleEditSave}
@@ -686,12 +784,14 @@ export function MicPageClient({ slug }: { slug: string }) {
 function SectionSlotGroup({
   section,
   isHost,
+  locked,
   onTakeSlot,
   onRemoveSlot,
   onHostRemove,
 }: {
   section: SectionData
   isHost: boolean
+  locked: boolean
   onTakeSlot: (slotNumber: number, displayNumber: number) => void
   onRemoveSlot: (slot: SlotData, displayNumber: number) => void
   onHostRemove: (slotNumber: number) => void
@@ -727,6 +827,7 @@ function SectionSlotGroup({
             slot={slot}
             displayNumber={idx + 1}
             isHost={isHost}
+            locked={locked}
             onTake={() => onTakeSlot(slot.number, idx + 1)}
             onRemove={() => onRemoveSlot(slot, idx + 1)}
             onHostRemove={() => onHostRemove(slot.number)}

@@ -15,6 +15,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { Pencil, Check, X, Loader2, Plus, Trash2 } from "lucide-react"
 import { checkSlugAvailability, type SectionData, type SectionInput } from "@/app/actions"
 import { ImageUpload } from "@/components/image-upload"
+import { SignupReleasePicker } from "@/components/signup-release-picker"
 
 function toSlug(value: string): string {
   return value
@@ -49,6 +50,8 @@ interface MicEditData {
   sections?: SectionData[]
   seriesSlug?: string | null
   seriesName?: string | null
+  signupOpensAt?: string | null
+  sendReminders?: boolean
 }
 
 type MicSaveData = Omit<MicEditData, "sections"> & { sections?: SectionInput[] }
@@ -458,6 +461,28 @@ export function EditMicModal({
             <p className="text-xs text-muted-foreground">
               Leave blank if this is a one-off event.
             </p>
+          </div>
+
+          <SignupReleasePicker
+            value={formData.signupOpensAt ?? null}
+            onChange={(val) => setFormData((prev) => ({ ...prev, signupOpensAt: val }))}
+          />
+
+          <div className="rounded-lg border border-border/50 bg-secondary/10 p-3">
+            <label className="flex items-center gap-3 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={formData.sendReminders ?? false}
+                onChange={(e) => setFormData((prev) => ({ ...prev, sendReminders: e.target.checked }))}
+                className="h-4 w-4 accent-neon-pink"
+              />
+              <div>
+                <span className="text-sm font-bold">Send reminder emails</span>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Automatically email everyone on the lineup ~6 hours before showtime.
+                </p>
+              </div>
+            </label>
           </div>
 
           <div className="flex gap-3 pt-2">

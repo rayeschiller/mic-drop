@@ -3,8 +3,50 @@
 
 @custom-variant dark (&:is(.dark *));
 
-/* Comedy club dark mode theme - neon accents */
+/* Light theme */
 :root {
+  --background: oklch(0.98 0 0);
+  --foreground: oklch(0.15 0.01 260);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.15 0.01 260);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.15 0.01 260);
+  --primary: oklch(0.62 0.25 330);
+  --primary-foreground: oklch(1 0 0);
+  --secondary: oklch(0.93 0.01 260);
+  --secondary-foreground: oklch(0.15 0.01 260);
+  --muted: oklch(0.93 0.01 260);
+  --muted-foreground: oklch(0.50 0.01 260);
+  --accent: oklch(0.55 0.18 130);
+  --accent-foreground: oklch(1 0 0);
+  --destructive: oklch(0.577 0.245 27.325);
+  --destructive-foreground: oklch(1 0 0);
+  --border: oklch(0.88 0.01 260);
+  --input: oklch(0.93 0.01 260);
+  --ring: oklch(0.62 0.25 330);
+  --chart-1: oklch(0.62 0.25 330);
+  --chart-2: oklch(0.55 0.18 130);
+  --chart-3: oklch(0.62 0.18 70);
+  --chart-4: oklch(0.55 0.22 303.9);
+  --chart-5: oklch(0.58 0.22 16.439);
+  --radius: 0.5rem;
+  --sidebar: oklch(0.95 0.01 260);
+  --sidebar-foreground: oklch(0.15 0.01 260);
+  --sidebar-primary: oklch(0.62 0.25 330);
+  --sidebar-primary-foreground: oklch(1 0 0);
+  --sidebar-accent: oklch(0.93 0.01 260);
+  --sidebar-accent-foreground: oklch(0.15 0.01 260);
+  --sidebar-border: oklch(0.88 0.01 260);
+  --sidebar-ring: oklch(0.62 0.25 330);
+
+  /* Neon colors (slightly deepened for light bg contrast) */
+  --neon-pink: oklch(0.62 0.25 330);
+  --neon-green: oklch(0.52 0.18 130);
+  --neon-amber: oklch(0.58 0.18 70);
+}
+
+/* Dark theme */
+.dark {
   --background: oklch(0.12 0.01 260);
   --foreground: oklch(0.98 0 0);
   --card: oklch(0.16 0.01 260);
@@ -38,8 +80,8 @@
   --sidebar-accent-foreground: oklch(0.98 0 0);
   --sidebar-border: oklch(0.28 0.02 260);
   --sidebar-ring: oklch(0.75 0.25 330);
-  
-  /* Custom neon colors */
+
+  /* Neon colors */
   --neon-pink: oklch(0.75 0.25 330);
   --neon-green: oklch(0.78 0.22 130);
   --neon-amber: oklch(0.78 0.18 70);
@@ -96,8 +138,8 @@
   body {
     @apply bg-background text-foreground;
   }
-  input[type="date"]::-webkit-calendar-picker-indicator,
-  input[type="time"]::-webkit-calendar-picker-indicator {
+  .dark input[type="date"]::-webkit-calendar-picker-indicator,
+  .dark input[type="time"]::-webkit-calendar-picker-indicator {
     filter: invert(1);
     opacity: 0.7;
     cursor: pointer;
