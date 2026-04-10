@@ -48,13 +48,14 @@ export async function getAllMics() {
 
   if (error || !mics) return []
 
-  const { data: takenSlots } = await admin
-    .from("slots")
-    .select("mic_id")
-    .eq("taken", true)
+  const [{ data: takenSlots }, { data: waitlistEntries }] = await Promise.all([
+    admin.from("slots").select("mic_id").eq("taken", true),
+    admin.from("waitlist_entries").select("mic_id"),
+  ])
 
   return mics.map((mic) => {
     const filledSlots = (takenSlots ?? []).filter((s) => s.mic_id === mic.id).length
+    const waitlistCount = (waitlistEntries ?? []).filter((w) => w.mic_id === mic.id).length
     return {
       id: mic.id,
       slug: mic.slug,
@@ -65,6 +66,7 @@ export async function getAllMics() {
       endTime: mic.end_time,
       totalSlots: mic.total_slots,
       filledSlots,
+      waitlistCount,
       createdAt: mic.created_at,
       hostEmail: mic.host_email,
       imageUrl: mic.image_url,
@@ -90,11 +92,18 @@ export async function getAdminMicDetail(slug: string) {
 
   if (!mic) return null
 
-  const { data: slots } = await admin
-    .from("slots")
-    .select("*")
-    .eq("mic_id", mic.id)
-    .order("slot_number", { ascending: true })
+  const [{ data: slots }, { data: waitlist }] = await Promise.all([
+    admin
+      .from("slots")
+      .select("*")
+      .eq("mic_id", mic.id)
+      .order("slot_number", { ascending: true }),
+    admin
+      .from("waitlist_entries")
+      .select("*")
+      .eq("mic_id", mic.id)
+      .order("created_at", { ascending: true }),
+  ])
 
   return {
     id: mic.id,
@@ -113,6 +122,14 @@ export async function getAdminMicDetail(slug: string) {
       performerName: s.performer_name,
       performerInstagram: s.performer_instagram,
       performerEmail: s.performer_email,
+    })),
+    waitlist: (waitlist ?? []).map((w, idx) => ({
+      id: w.id,
+      position: idx + 1,
+      performerName: w.performer_name,
+      performerInstagram: w.performer_instagram,
+      performerEmail: w.performer_email,
+      createdAt: w.created_at,
     })),
   }
 }

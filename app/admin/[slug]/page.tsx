@@ -1,6 +1,6 @@
 import Link from "next/link"
 import { notFound, redirect } from "next/navigation"
-import { Mic2, ArrowLeft, MapPin, CalendarDays, Clock, Mail, Instagram } from "lucide-react"
+import { Mic2, ArrowLeft, MapPin, CalendarDays, Clock, Mail, Instagram, Timer } from "lucide-react"
 import { getAdminMicDetail, checkAdminAuth } from "../actions"
 import { DeleteMicButton } from "./delete-button"
 
@@ -85,7 +85,7 @@ export default async function AdminMicPage({ params }: { params: Promise<{ slug:
             )}
           </div>
 
-          <div className="flex items-center gap-4 pt-2 border-t border-border">
+          <div className="flex items-center gap-4 pt-2 border-t border-border flex-wrap">
             <div>
               <p className="text-xs text-muted-foreground">Signed up</p>
               <p className="text-2xl font-bold text-neon-green">{filledSlots.length}</p>
@@ -98,6 +98,12 @@ export default async function AdminMicPage({ params }: { params: Promise<{ slug:
               <p className="text-xs text-muted-foreground">Open slots</p>
               <p className="text-2xl font-bold text-muted-foreground">{mic.totalSlots - filledSlots.length}</p>
             </div>
+            {mic.waitlist.length > 0 && (
+              <div>
+                <p className="text-xs text-muted-foreground">Waitlist</p>
+                <p className="text-2xl font-bold text-neon-amber">{mic.waitlist.length}</p>
+              </div>
+            )}
           </div>
         </div>
 
@@ -144,6 +150,47 @@ export default async function AdminMicPage({ params }: { params: Promise<{ slug:
             </table>
           </div>
         </div>
+        {/* Waitlist */}
+        {mic.waitlist.length > 0 && (
+          <div>
+            <h2 className="text-lg font-bold mb-4 flex items-center gap-2">
+              <Timer className="h-5 w-5 text-neon-amber" />
+              Waitlist ({mic.waitlist.length})
+            </h2>
+            <div className="rounded-xl border border-border overflow-hidden">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-border bg-secondary/30">
+                    <th className="text-left px-4 py-3 font-medium text-muted-foreground w-12">#</th>
+                    <th className="text-left px-4 py-3 font-medium text-muted-foreground">Name</th>
+                    <th className="text-left px-4 py-3 font-medium text-muted-foreground hidden sm:table-cell">Instagram</th>
+                    <th className="text-left px-4 py-3 font-medium text-muted-foreground hidden md:table-cell">Email</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {mic.waitlist.map((entry) => (
+                    <tr key={entry.id} className="border-b border-border last:border-0">
+                      <td className="px-4 py-3">
+                        <span className="flex h-7 w-7 items-center justify-center rounded-full bg-neon-amber/20 font-mono text-xs font-bold text-neon-amber">
+                          {entry.position}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 font-medium">{entry.performerName}</td>
+                      <td className="px-4 py-3 text-muted-foreground hidden sm:table-cell">
+                        {entry.performerInstagram
+                          ? <span className="flex items-center gap-1"><Instagram className="h-3 w-3" />@{entry.performerInstagram.replace(/^@/, "")}</span>
+                          : <span className="italic">—</span>}
+                      </td>
+                      <td className="px-4 py-3 text-muted-foreground hidden md:table-cell">
+                        {entry.performerEmail}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
       </div>
     </main>
   )

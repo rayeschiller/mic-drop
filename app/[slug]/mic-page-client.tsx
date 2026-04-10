@@ -600,11 +600,20 @@ export function MicPageClient({ slug }: { slug: string }) {
 
                     <div className="flex items-center gap-3">
                       <Users className="h-5 w-5 text-white flex-shrink-0" />
-                      <span className={`text-lg font-bold ${isFull ? "text-destructive" : "text-accent"}`}>
-                        {isFull
-                          ? "Congrats, this mic is emotionally unavailable."
-                          : `${availableSlotsCount} of ${totalSlots} slots left`}
-                      </span>
+                      {isFull ? (
+                        <span className="flex flex-col">
+                          <span className="text-lg font-bold text-destructive">
+                            Sorry, this mic is emotionally unavailable (full)
+                          </span>
+                          <span className="text-sm font-normal text-destructive/80 mt-0.5">
+                            Sign up on the waitlist below and you&apos;ll get notified when a slot opens up!
+                          </span>
+                        </span>
+                      ) : (
+                        <span className={`text-lg font-bold text-accent`}>
+                          {`${availableSlotsCount} of ${totalSlots} slots left`}
+                        </span>
+                      )}
                     </div>
                   </div>
 

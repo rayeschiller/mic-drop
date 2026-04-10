@@ -1,5 +1,5 @@
 import Link from "next/link"
-import { Mic2, LogOut } from "lucide-react"
+import { Mic2, LogOut, Timer } from "lucide-react"
 import { getAllMics, adminLogout, checkAdminAuth } from "./actions"
 import { redirect } from "next/navigation"
 
@@ -14,6 +14,7 @@ export default async function AdminPage() {
 
   const mics = await getAllMics()
   const totalSignups = mics.reduce((sum, m) => sum + m.filledSlots, 0)
+  const totalWaitlist = mics.reduce((sum, m) => sum + m.waitlistCount, 0)
 
   return (
     <main className="min-h-screen">
@@ -63,6 +64,12 @@ export default async function AdminPage() {
                 : Math.round((totalSignups / mics.reduce((s, m) => s + m.totalSlots, 0)) * 100) + "%"}
             </p>
           </div>
+          {totalWaitlist > 0 && (
+            <div className="rounded-xl border border-neon-amber/30 bg-neon-amber/10 p-5">
+              <p className="text-sm text-neon-amber">Waitlisted</p>
+              <p className="text-3xl font-bold mt-1 text-neon-amber">{totalWaitlist}</p>
+            </div>
+          )}
         </div>
 
         {/* Mic table */}
@@ -97,7 +104,7 @@ export default async function AdminPage() {
                   <td className="px-4 py-3 text-muted-foreground hidden sm:table-cell">{mic.venue}</td>
                   <td className="px-4 py-3 text-muted-foreground hidden md:table-cell">{formatDate(mic.date)}</td>
                   <td className="px-4 py-3">
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 flex-wrap">
                       <div className="flex-1 max-w-20 h-1.5 rounded-full bg-secondary overflow-hidden">
                         <div
                           className="h-full bg-neon-green rounded-full"
@@ -107,6 +114,12 @@ export default async function AdminPage() {
                       <span className="text-muted-foreground whitespace-nowrap">
                         {mic.filledSlots}/{mic.totalSlots}
                       </span>
+                      {mic.waitlistCount > 0 && (
+                        <span className="flex items-center gap-0.5 text-xs text-neon-amber whitespace-nowrap">
+                          <Timer className="h-3 w-3" />
+                          {mic.waitlistCount}
+                        </span>
+                      )}
                     </div>
                   </td>
                   <td className="px-4 py-3 text-muted-foreground text-xs hidden sm:table-cell">
