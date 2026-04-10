@@ -76,6 +76,128 @@ export async function sendPerformerReminderEmails({
   )
 }
 
+export async function sendWaitlistConfirmationEmail({
+  to,
+  performerName,
+  micName,
+  micSlug,
+  venue,
+  date,
+  startTime,
+  position,
+}: {
+  to: string
+  performerName: string
+  micName: string
+  micSlug: string
+  venue: string
+  date: string
+  startTime: string
+  position: number
+}) {
+  const micUrl = `${process.env.NEXT_PUBLIC_SITE_URL}/${micSlug}`
+  const dateFormatted = formatDate(date)
+  const timeFormatted = formatTime(startTime)
+
+  await resend.emails.send({
+    from: process.env.RESEND_FROM_EMAIL ?? "Mic Drop <noreply@yourdomain.com>",
+    to,
+    subject: `You're #${position} on the waitlist — ${micName}`,
+    html: `
+      <div style="font-family: sans-serif; max-width: 480px; margin: 0 auto; padding: 32px 24px; background: #1a1a2e; color: #f8f8f8; border-radius: 12px;">
+        <h1 style="font-size: 28px; font-weight: 800; margin: 0 0 8px;">
+          Mic<span style="color: #e879a0;">Drop</span>
+        </h1>
+        <p style="color: #aaa; margin: 0 0 32px;">You're on the waitlist.</p>
+
+        <h2 style="font-size: 20px; font-weight: 700; margin: 0 0 16px;">${micName}</h2>
+
+        <div style="display: flex; flex-direction: column; gap: 8px; margin: 0 0 24px;">
+          <p style="margin: 0; font-size: 15px;">📍 ${venue}</p>
+          <p style="margin: 0; font-size: 15px;">📅 ${dateFormatted}</p>
+          <p style="margin: 0; font-size: 15px;">🕐 ${timeFormatted}</p>
+        </div>
+
+        <div style="margin: 0 0 24px; padding: 20px; background: #111124; border-radius: 8px; border: 1px solid #333; text-align: center;">
+          <p style="margin: 0 0 4px; font-size: 12px; text-transform: uppercase; letter-spacing: 0.1em; color: #aaa;">Your Position</p>
+          <p style="margin: 0; font-size: 48px; font-weight: 800; color: #e879a0;">#${position}</p>
+        </div>
+
+        <p style="font-size: 16px; color: #f8f8f8; margin: 0 0 24px;">
+          Hey ${performerName} — we'll email you if a slot opens up. Keep your fingers crossed.
+        </p>
+
+        <a href="${micUrl}" style="display: inline-block; padding: 12px 24px; background: #e879a0; color: #fff; text-decoration: none; border-radius: 8px; font-weight: 700; font-size: 15px;">
+          View Lineup →
+        </a>
+
+        <p style="margin: 24px 0 0; font-size: 13px; color: #666;">
+          Changed your mind? <a href="${micUrl}" style="color: #e879a0;">Visit the page</a> to leave the waitlist.
+        </p>
+      </div>
+    `,
+  })
+}
+
+export async function sendWaitlistPromotionEmail({
+  to,
+  performerName,
+  micName,
+  micSlug,
+  venue,
+  date,
+  startTime,
+}: {
+  to: string
+  performerName: string
+  micName: string
+  micSlug: string
+  venue: string
+  date: string
+  startTime: string
+}) {
+  const micUrl = `${process.env.NEXT_PUBLIC_SITE_URL}/${micSlug}`
+  const dateFormatted = formatDate(date)
+  const timeFormatted = formatTime(startTime)
+
+  await resend.emails.send({
+    from: process.env.RESEND_FROM_EMAIL ?? "Mic Drop <noreply@yourdomain.com>",
+    to,
+    subject: `You're in! A slot opened up — ${micName}`,
+    html: `
+      <div style="font-family: sans-serif; max-width: 480px; margin: 0 auto; padding: 32px 24px; background: #1a1a2e; color: #f8f8f8; border-radius: 12px;">
+        <h1 style="font-size: 28px; font-weight: 800; margin: 0 0 8px;">
+          Mic<span style="color: #e879a0;">Drop</span>
+        </h1>
+        <p style="color: #aaa; margin: 0 0 32px;">The list came through for you.</p>
+
+        <h2 style="font-size: 20px; font-weight: 700; margin: 0 0 16px;">${micName}</h2>
+
+        <div style="display: flex; flex-direction: column; gap: 8px; margin: 0 0 24px;">
+          <p style="margin: 0; font-size: 15px;">📍 ${venue}</p>
+          <p style="margin: 0; font-size: 15px;">📅 ${dateFormatted}</p>
+          <p style="margin: 0; font-size: 15px;">🕐 ${timeFormatted}</p>
+        </div>
+
+        <p style="font-size: 18px; font-weight: 700; color: #f8f8f8; margin: 0 0 8px;">
+          Hey ${performerName} — you got a slot.
+        </p>
+        <p style="font-size: 15px; color: #aaa; margin: 0 0 24px;">
+          Someone dropped out and you're next in line. You're now on the lineup.
+        </p>
+
+        <a href="${micUrl}" style="display: inline-block; padding: 12px 24px; background: #e879a0; color: #fff; text-decoration: none; border-radius: 8px; font-weight: 700; font-size: 15px;">
+          View Your Slot →
+        </a>
+
+        <p style="margin: 24px 0 0; font-size: 13px; color: #666;">
+          Can't make it? <a href="${micUrl}" style="color: #e879a0;">Visit the page</a> to remove yourself from the list.
+        </p>
+      </div>
+    `,
+  })
+}
+
 export async function sendHostPinEmail({
   to,
   micName,

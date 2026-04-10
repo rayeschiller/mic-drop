@@ -24,6 +24,8 @@ import {
 import { Button } from "@/components/ui/button"
 import { SignupModal } from "@/components/signup-modal"
 import { RemoveModal } from "@/components/remove-modal"
+import { WaitlistModal } from "@/components/waitlist-modal"
+import { LeaveWaitlistModal } from "@/components/leave-waitlist-modal"
 import { HostPinModal } from "@/components/host-pin-modal"
 import { EditMicModal } from "@/components/edit-mic-modal"
 import {
@@ -35,10 +37,14 @@ import {
   verifyHostPin,
   hostRemoveSlot,
   hostUpdateMic,
+  joinWaitlist,
+  leaveWaitlist,
+  hostRemoveWaitlistEntry,
   type MicData,
   type SlotData,
   type SectionData,
   type SectionInput,
+  type WaitlistEntry,
 } from "@/app/actions"
 
 function formatDate(dateString: string): string {
@@ -238,6 +244,11 @@ export function MicPageClient({ slug }: { slug: string }) {
   const [hostPinModalOpen, setHostPinModalOpen] = useState(false)
   const [editModalOpen, setEditModalOpen] = useState(false)
 
+  // Waitlist state
+  const [waitlistPosition, setWaitlistPosition] = useState<number | null>(null)
+  const [waitlistModalOpen, setWaitlistModalOpen] = useState(false)
+  const [leaveWaitlistModalOpen, setLeaveWaitlistModalOpen] = useState(false)
+
   // Series / other dates
   const [otherDates, setOtherDates] = useState<{ id: string; slug: string; name: string; date: string; startTime: string; signupOpensAt: string | null }[]>([])
 
@@ -373,6 +384,35 @@ export function MicPageClient({ slug }: { slug: string }) {
       } else {
         await loadMic()
       }
+    }
+  }
+
+  const handleJoinWaitlist = async (name: string, instagram: string, email: string) => {
+    const result = await joinWaitlist(slug, name, instagram, email)
+    if (result.success) {
+      setWaitlistPosition(result.position ?? null)
+      setWaitlistModalOpen(false)
+      await loadMic()
+    } else {
+      alert(result.error || "Failed to join waitlist")
+    }
+  }
+
+  const handleLeaveWaitlist = async (email: string): Promise<boolean> => {
+    const result = await leaveWaitlist(slug, email)
+    if (result.success) {
+      setWaitlistPosition(null)
+      await loadMic()
+      return true
+    }
+    return false
+  }
+
+  const handleHostRemoveWaitlistEntry = async (entryId: string) => {
+    if (!hostPin) return
+    const result = await hostRemoveWaitlistEntry(slug, hostPin, entryId)
+    if (result.success) {
+      await loadMic()
     }
   }
 
@@ -660,18 +700,60 @@ export function MicPageClient({ slug }: { slug: string }) {
                 </div>
               )}
 
-              {isFull && (
+              {isFull && !isHost && (
                 <div className="mt-8 rounded-xl border-2 border-dashed border-border p-8 text-center">
-                  <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-muted">
-                    <Mic2 className="h-8 w-8 text-muted-foreground" />
-                  </div>
-                  <h3 className="text-xl font-bold text-foreground">Waitlist</h3>
-                  <p className="mt-2 text-muted-foreground">
-                    {"You might get bumped up. You probably won't."}
-                  </p>
-                  <p className="mt-4 text-sm text-muted-foreground">
-                    {"(Waitlist feature coming soon. For now, just show up and hope.)"}
-                  </p>
+                  {waitlistPosition ? (
+                    <>
+                      <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-primary/20">
+                        <Clock className="h-8 w-8 text-primary" />
+                      </div>
+                      <h3 className="text-xl font-bold text-foreground">
+                        {"You're on the waitlist"}
+                      </h3>
+                      <p className="mt-2 text-muted-foreground">
+                        Position <span className="font-bold text-foreground">#{waitlistPosition}</span>. {"We'll email you if a slot opens up."}
+                      </p>
+                      <button
+                        onClick={() => setLeaveWaitlistModalOpen(true)}
+                        className="mt-4 text-sm text-muted-foreground hover:text-destructive transition-colors underline cursor-pointer"
+                      >
+                        Leave waitlist
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-muted">
+                        <Mic2 className="h-8 w-8 text-muted-foreground" />
+                      </div>
+                      <h3 className="text-xl font-bold text-foreground">Waitlist</h3>
+                      <p className="mt-2 text-muted-foreground">
+                        {mic.waitlistCount > 0
+                          ? `${mic.waitlistCount} ${mic.waitlistCount === 1 ? "person" : "people"} ahead of you. You might get lucky.`
+                          : "Be first in line. You might get lucky."}
+                      </p>
+                      <Button
+                        onClick={() => setWaitlistModalOpen(true)}
+                        className="mt-4 bg-primary text-primary-foreground hover:bg-primary/90 font-bold"
+                      >
+                        Join Waitlist
+                      </Button>
+                    </>
+                  )}
+                </div>
+              )}
+
+              {isHost && mic.waitlist && mic.waitlist.length > 0 && (
+                <div className="mt-6 space-y-3">
+                  <h3 className="font-semibold text-foreground">
+                    Waitlist ({mic.waitlist.length})
+                  </h3>
+                  {mic.waitlist.map((entry) => (
+                    <WaitlistEntryRow
+                      key={entry.id}
+                      entry={entry}
+                      onRemove={() => handleHostRemoveWaitlistEntry(entry.id)}
+                    />
+                  ))}
                 </div>
               )}
             </div>
@@ -745,6 +827,18 @@ export function MicPageClient({ slug }: { slug: string }) {
         onSubmit={handleRemoveConfirm}
       />
 
+      {/* Waitlist Modals */}
+      <WaitlistModal
+        open={waitlistModalOpen}
+        onOpenChange={setWaitlistModalOpen}
+        onSubmit={handleJoinWaitlist}
+      />
+      <LeaveWaitlistModal
+        open={leaveWaitlistModalOpen}
+        onOpenChange={setLeaveWaitlistModalOpen}
+        onSubmit={handleLeaveWaitlist}
+      />
+
       {/* Host PIN Modal */}
       <HostPinModal
         open={hostPinModalOpen}
@@ -778,6 +872,45 @@ export function MicPageClient({ slug }: { slug: string }) {
         />
       )}
     </main>
+  )
+}
+
+function WaitlistEntryRow({
+  entry,
+  onRemove,
+}: {
+  entry: WaitlistEntry
+  onRemove: () => void
+}) {
+  return (
+    <div>
+      <div className="flex items-center justify-between rounded-xl rounded-b-none border border-border bg-card px-4 py-3">
+        <div className="flex items-center gap-4">
+          <span className="flex h-8 w-8 items-center justify-center rounded-full bg-muted font-mono text-sm font-bold text-muted-foreground flex-shrink-0">
+            {entry.position}
+          </span>
+          <div>
+            <p className="font-medium text-foreground">{entry.performerName}</p>
+            {entry.performerInstagram && (
+              <p className="text-xs text-muted-foreground font-mono">
+                @{entry.performerInstagram.replace(/^@/, "")}
+              </p>
+            )}
+          </div>
+        </div>
+        <button
+          onClick={onRemove}
+          className="flex items-center gap-1 text-xs text-destructive hover:text-destructive/80 cursor-pointer transition-colors"
+        >
+          <Trash2 className="h-3.5 w-3.5" />
+          Remove
+        </button>
+      </div>
+      <div className="flex items-center gap-2 rounded-b-xl border border-t-0 border-border bg-secondary/30 px-4 py-2">
+        <Mail className="h-3.5 w-3.5 text-muted-foreground" />
+        <span className="font-mono text-xs text-muted-foreground">{entry.performerEmail}</span>
+      </div>
+    </div>
   )
 }
 

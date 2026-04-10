@@ -2,7 +2,7 @@
 
 import { createAdminClient } from "@/lib/supabase/admin"
 import { createClient } from "@/lib/supabase/server"
-import { sendHostPinEmail } from "@/lib/email"
+import { sendHostPinEmail, sendWaitlistConfirmationEmail, sendWaitlistPromotionEmail } from "@/lib/email"
 import crypto from "crypto"
 
 // --- Helpers ---
@@ -65,6 +65,16 @@ export interface MicData {
   seriesName: string | null
   signupOpensAt: string | null
   sendReminders: boolean
+  waitlistCount: number
+  waitlist?: WaitlistEntry[]  // only populated in host mode
+}
+
+export interface WaitlistEntry {
+  id: string
+  performerName: string
+  performerInstagram: string | null
+  performerEmail: string
+  position: number
 }
 
 export interface SectionInput {
@@ -211,7 +221,9 @@ function buildMicData(
   mic: Record<string, unknown>,
   slots: Record<string, unknown>[] | null,
   sections: Record<string, unknown>[] | null,
-  includeEmails: boolean
+  includeEmails: boolean,
+  waitlistCount: number = 0,
+  waitlistRows?: Record<string, unknown>[]
 ): MicData {
   const slotsArr = slots || []
   const sectionsArr = sections || []
@@ -247,6 +259,14 @@ function buildMicData(
       ? sectionData.reduce((sum, s) => sum + s.totalSlots, 0)
       : (mic.total_slots as number)
 
+  const waitlist: WaitlistEntry[] | undefined = waitlistRows?.map((w, idx) => ({
+    id: w.id as string,
+    performerName: w.performer_name as string,
+    performerInstagram: w.performer_instagram as string | null,
+    performerEmail: w.performer_email as string,
+    position: idx + 1,
+  }))
+
   return {
     id: mic.id as string,
     slug: mic.slug as string,
@@ -264,11 +284,14 @@ function buildMicData(
     seriesName: mic.series_name as string | null,
     signupOpensAt: mic.signup_opens_at as string | null,
     sendReminders: (mic.send_reminders as boolean) ?? false,
+    waitlistCount,
+    waitlist,
   }
 }
 
 export async function getMic(slug: string): Promise<{ mic: MicData | null; error?: string }> {
   const supabase = await createClient()
+  const admin = createAdminClient()
 
   const { data: mic, error: micError } = await supabase
     .from("mics")
@@ -280,7 +303,7 @@ export async function getMic(slug: string): Promise<{ mic: MicData | null; error
     return { mic: null }
   }
 
-  const [{ data: slots, error: slotsError }, { data: sections }] = await Promise.all([
+  const [{ data: slots, error: slotsError }, { data: sections }, { count: waitlistCount }] = await Promise.all([
     supabase
       .from("slots")
       .select("id, slot_number, taken, performer_name, performer_instagram, section_id")
@@ -291,6 +314,10 @@ export async function getMic(slug: string): Promise<{ mic: MicData | null; error
       .select("*")
       .eq("mic_id", mic.id)
       .order("order_index", { ascending: true }),
+    admin
+      .from("waitlist_entries")
+      .select("id", { count: "exact", head: true })
+      .eq("mic_id", mic.id),
   ])
 
   if (slotsError) {
@@ -298,7 +325,7 @@ export async function getMic(slug: string): Promise<{ mic: MicData | null; error
   }
 
   return {
-    mic: buildMicData(mic, slots, sections, false),
+    mic: buildMicData(mic, slots, sections, false, waitlistCount ?? 0),
   }
 }
 
@@ -344,6 +371,62 @@ export async function signupForSlot(
   return { success: true }
 }
 
+// Promote the first waitlist entry to slotId, or clear the slot if no one is waiting.
+async function promoteOrClearSlot(
+  admin: ReturnType<typeof createAdminClient>,
+  slotId: string,
+  micId: string,
+  mic: { name: string; slug: string; venue: string; date: string; start_time: string }
+): Promise<{ error?: string }> {
+  const { data: firstWaiting } = await admin
+    .from("waitlist_entries")
+    .select("*")
+    .eq("mic_id", micId)
+    .order("created_at", { ascending: true })
+    .limit(1)
+    .maybeSingle()
+
+  if (firstWaiting) {
+    const { error } = await admin
+      .from("slots")
+      .update({
+        taken: true,
+        performer_name: firstWaiting.performer_name,
+        performer_instagram: firstWaiting.performer_instagram,
+        performer_email: firstWaiting.performer_email,
+      })
+      .eq("id", slotId)
+
+    if (error) return { error: "Failed to promote from waitlist" }
+
+    await admin.from("waitlist_entries").delete().eq("id", firstWaiting.id)
+
+    sendWaitlistPromotionEmail({
+      to: firstWaiting.performer_email,
+      performerName: firstWaiting.performer_name,
+      micName: mic.name,
+      micSlug: mic.slug,
+      venue: mic.venue,
+      date: mic.date,
+      startTime: mic.start_time,
+    }).catch((err) => console.error("Failed to send waitlist promotion email:", err))
+  } else {
+    const { error } = await admin
+      .from("slots")
+      .update({
+        taken: false,
+        performer_name: null,
+        performer_instagram: null,
+        performer_email: null,
+      })
+      .eq("id", slotId)
+
+    if (error) return { error: "Failed to clear slot" }
+  }
+
+  return {}
+}
+
 export async function removeFromSlot(
   micSlug: string,
   slotNumber: number,
@@ -353,7 +436,7 @@ export async function removeFromSlot(
 
   const { data: mic } = await admin
     .from("mics")
-    .select("id")
+    .select("id, name, slug, venue, date, start_time")
     .eq("slug", micSlug)
     .single()
 
@@ -373,16 +456,7 @@ export async function removeFromSlot(
     return { success: false, error: "Email does not match" }
   }
 
-  const { error } = await admin
-    .from("slots")
-    .update({
-      taken: false,
-      performer_name: null,
-      performer_instagram: null,
-      performer_email: null,
-    })
-    .eq("id", slot.id)
-
+  const { error } = await promoteOrClearSlot(admin, slot.id, mic.id, mic as { name: string; slug: string; venue: string; date: string; start_time: string })
   if (error) {
     console.error("Failed to remove:", error)
     return { success: false, error: "Failed to remove" }
@@ -432,7 +506,7 @@ export async function getMicWithEmails(
 
   if (!mic) return { mic: null, error: "Mic not found" }
 
-  const [{ data: slots }, { data: sections }] = await Promise.all([
+  const [{ data: slots }, { data: sections }, { data: waitlistRows, count: waitlistCount }] = await Promise.all([
     admin
       .from("slots")
       .select("*")
@@ -443,10 +517,15 @@ export async function getMicWithEmails(
       .select("*")
       .eq("mic_id", mic.id)
       .order("order_index", { ascending: true }),
+    admin
+      .from("waitlist_entries")
+      .select("*", { count: "exact" })
+      .eq("mic_id", mic.id)
+      .order("created_at", { ascending: true }),
   ])
 
   return {
-    mic: buildMicData(mic, slots, sections, true),
+    mic: buildMicData(mic, slots, sections, true, waitlistCount ?? 0, waitlistRows ?? []),
   }
 }
 
@@ -462,23 +541,22 @@ export async function hostRemoveSlot(
 
   const { data: mic } = await admin
     .from("mics")
-    .select("id")
+    .select("id, name, slug, venue, date, start_time")
     .eq("slug", micSlug)
     .single()
 
   if (!mic) return { success: false, error: "Mic not found" }
 
-  const { error } = await admin
+  const { data: slot } = await admin
     .from("slots")
-    .update({
-      taken: false,
-      performer_name: null,
-      performer_instagram: null,
-      performer_email: null,
-    })
+    .select("id")
     .eq("mic_id", mic.id)
     .eq("slot_number", slotNumber)
+    .single()
 
+  if (!slot) return { success: false, error: "Slot not found" }
+
+  const { error } = await promoteOrClearSlot(admin, slot.id, mic.id, mic as { name: string; slug: string; venue: string; date: string; start_time: string })
   if (error) {
     console.error("Failed to remove slot:", error)
     return { success: false, error: "Failed to remove" }
@@ -699,6 +777,133 @@ async function updateSections(
         await admin.from("slots").insert(slotsToInsert)
       }
     }
+  }
+
+  return { success: true }
+}
+
+// --- Waitlist actions ---
+
+export async function joinWaitlist(
+  micSlug: string,
+  name: string,
+  instagram: string,
+  email: string
+): Promise<{ success: boolean; position?: number; error?: string }> {
+  const admin = createAdminClient()
+
+  const { data: mic } = await admin
+    .from("mics")
+    .select("id, name, slug, venue, date, start_time")
+    .eq("slug", micSlug)
+    .single()
+
+  if (!mic) return { success: false, error: "Mic not found" }
+
+  // Check if already on waitlist
+  const { data: existingWaitlist } = await admin
+    .from("waitlist_entries")
+    .select("id")
+    .eq("mic_id", mic.id)
+    .ilike("performer_email", email)
+    .maybeSingle()
+
+  if (existingWaitlist) return { success: false, error: "You're already on the waitlist" }
+
+  // Check if they already have a slot
+  const { data: existingSlot } = await admin
+    .from("slots")
+    .select("id")
+    .eq("mic_id", mic.id)
+    .ilike("performer_email", email)
+    .eq("taken", true)
+    .maybeSingle()
+
+  if (existingSlot) return { success: false, error: "You already have a slot" }
+
+  const { error } = await admin
+    .from("waitlist_entries")
+    .insert({
+      mic_id: mic.id,
+      performer_name: name,
+      performer_instagram: instagram || null,
+      performer_email: email,
+    })
+
+  if (error) {
+    console.error("Failed to join waitlist:", error)
+    return { success: false, error: "Failed to join waitlist" }
+  }
+
+  const { count } = await admin
+    .from("waitlist_entries")
+    .select("id", { count: "exact", head: true })
+    .eq("mic_id", mic.id)
+
+  const position = count ?? 1
+
+  sendWaitlistConfirmationEmail({
+    to: email,
+    performerName: name,
+    micName: mic.name,
+    micSlug: mic.slug,
+    venue: mic.venue,
+    date: mic.date,
+    startTime: mic.start_time,
+    position,
+  }).catch((err) => console.error("Failed to send waitlist confirmation email:", err))
+
+  return { success: true, position }
+}
+
+export async function leaveWaitlist(
+  micSlug: string,
+  email: string
+): Promise<{ success: boolean; error?: string }> {
+  const admin = createAdminClient()
+
+  const { data: mic } = await admin
+    .from("mics")
+    .select("id")
+    .eq("slug", micSlug)
+    .single()
+
+  if (!mic) return { success: false, error: "Mic not found" }
+
+  const { data: entry } = await admin
+    .from("waitlist_entries")
+    .select("id")
+    .eq("mic_id", mic.id)
+    .ilike("performer_email", email)
+    .maybeSingle()
+
+  if (!entry) return { success: false, error: "You're not on the waitlist" }
+
+  const { error } = await admin.from("waitlist_entries").delete().eq("id", entry.id)
+
+  if (error) {
+    console.error("Failed to leave waitlist:", error)
+    return { success: false, error: "Failed to leave waitlist" }
+  }
+
+  return { success: true }
+}
+
+export async function hostRemoveWaitlistEntry(
+  micSlug: string,
+  pin: string,
+  entryId: string
+): Promise<{ success: boolean; error?: string }> {
+  const verified = await verifyHostPin(micSlug, pin)
+  if (!verified.success) return { success: false, error: "Unauthorized" }
+
+  const admin = createAdminClient()
+
+  const { error } = await admin.from("waitlist_entries").delete().eq("id", entryId)
+
+  if (error) {
+    console.error("Failed to remove waitlist entry:", error)
+    return { success: false, error: "Failed to remove" }
   }
 
   return { success: true }
