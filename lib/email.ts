@@ -76,6 +76,64 @@ export async function sendPerformerReminderEmails({
   )
 }
 
+export async function sendWeekReminderEmails({
+  performers,
+  micName,
+  micSlug,
+  venue,
+  date,
+  startTime,
+}: {
+  performers: { name: string; email: string }[]
+  micName: string
+  micSlug: string
+  venue: string
+  date: string
+  startTime: string
+}) {
+  const micUrl = `${process.env.NEXT_PUBLIC_SITE_URL}/${micSlug}`
+  const dateFormatted = formatDate(date)
+  const timeFormatted = formatTime(startTime)
+
+  await Promise.allSettled(
+    performers.map(({ name, email }) =>
+      resend.emails.send({
+        from: process.env.RESEND_FROM_EMAIL ?? "Mic Drop <noreply@yourdomain.com>",
+        to: email,
+        subject: `You're on the lineup next week — ${micName}`,
+        html: `
+          <div style="font-family: sans-serif; max-width: 480px; margin: 0 auto; padding: 32px 24px; background: #1a1a2e; color: #f8f8f8; border-radius: 12px;">
+            <h1 style="font-size: 28px; font-weight: 800; margin: 0 0 8px;">
+              Mic<span style="color: #e879a0;">Drop</span>
+            </h1>
+            <p style="color: #aaa; margin: 0 0 32px;">Just a heads up — you've got a mic next week.</p>
+
+            <h2 style="font-size: 22px; font-weight: 700; margin: 0 0 16px;">${micName}</h2>
+
+            <div style="display: flex; flex-direction: column; gap: 8px; margin: 0 0 24px;">
+              <p style="margin: 0; font-size: 15px;">📍 ${venue}</p>
+              <p style="margin: 0; font-size: 15px;">📅 ${dateFormatted}</p>
+              <p style="margin: 0; font-size: 15px;">🕐 ${timeFormatted}</p>
+            </div>
+
+            <p style="font-size: 16px; color: #f8f8f8; margin: 0 0 24px;">
+              Hey ${name} — you're on the list. Start writing.
+            </p>
+
+            <a href="${micUrl}" style="display: inline-block; padding: 12px 24px; background: #e879a0; color: #fff; text-decoration: none; border-radius: 8px; font-weight: 700; font-size: 15px;">
+              View Lineup →
+            </a>
+
+            <p style="margin: 24px 0 0; font-size: 13px; color: #666;">
+              Can't make it? <a href="${micUrl}" style="color: #e879a0;">Visit the page</a> to remove yourself from the list.
+            </p>
+          </div>
+        `,
+      })
+    )
+  )
+}
+
 export async function sendWaitlistConfirmationEmail({
   to,
   performerName,
