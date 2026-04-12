@@ -1,0 +1,27 @@
+# Mic Drop
+
+> Open mic sign-ups, minus the chaos.
+
+Mic Drop is a lightweight web app for managing open mic night sign-ups. Hosts create a mic event with a name, date, and slot count; comedians sign up via a shared link — no accounts, no apps, no spreadsheets.
+
+## Core Features
+
+- **Create a mic** — Hosts set a name, date, and number of performer slots
+- **Shareable links** — Each mic gets a unique slug-based URL (e.g. `/tuesday-night-laughs`)
+- **No-account sign-ups** — Comedians add their name to the list directly from the link
+- **Email reminders** — Automated reminder emails sent to sign-ups before the show
+- **Admin dashboard** — Hosts can view and manage all their mics at `/admin`
+
+## Project Structure
+
+- `app/page.tsx` — Homepage / landing page
+- `app/create/page.tsx` — Create a new open mic event
+- `app/[slug]/page.tsx` — Public sign-up page for a specific mic
+- `app/admin/page.tsx` — Admin dashboard (authenticated)
+- `app/admin/[slug]/page.tsx` — Admin detail view for a specific mic
+- `app/api/send-reminders/` — API route for day-of reminder emails
+- `app/api/send-week-reminders/` — API route for week-ahead reminder emails
+- `app/actions.ts` — Server actions for sign-up logic
+- `app/admin/actions.ts` — Server actions for admin operations
+- `middleware.ts` — Auth middleware protecting `/admin` routes
+
