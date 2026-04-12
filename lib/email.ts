@@ -256,6 +256,105 @@ export async function sendWaitlistPromotionEmail({
   })
 }
 
+export async function sendWeeklyDigestEmail({
+  to,
+  stats,
+  upcomingMics,
+}: {
+  to: string
+  stats: {
+    totalMics: number
+    micsThisWeek: number
+    totalSignups: number
+    signupsThisWeek: number
+    totalWithEmail: number
+    totalWaitlist: number
+  }
+  upcomingMics: {
+    name: string
+    venue: string
+    date: string
+    startTime: string
+    slug: string
+    slotsTaken: number
+    totalSlots: number
+  }[]
+}) {
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? ""
+
+  const upcomingRows = upcomingMics.length
+    ? upcomingMics
+        .map((mic) => {
+          const fillPct = mic.totalSlots > 0 ? Math.round((mic.slotsTaken / mic.totalSlots) * 100) : 0
+          const bar = "█".repeat(Math.round(fillPct / 10)) + "░".repeat(10 - Math.round(fillPct / 10))
+          return `
+            <tr>
+              <td style="padding: 12px 0; border-bottom: 1px solid #222;">
+                <a href="${siteUrl}/${mic.slug}" style="color: #e879a0; font-weight: 700; text-decoration: none; font-size: 15px;">${mic.name}</a>
+                <div style="color: #aaa; font-size: 13px; margin-top: 2px;">${mic.venue} &middot; ${formatDate(mic.date)} &middot; ${formatTime(mic.startTime)}</div>
+                <div style="font-family: monospace; font-size: 12px; margin-top: 6px; color: #e879a0;">${bar} ${mic.slotsTaken}/${mic.totalSlots} slots (${fillPct}%)</div>
+              </td>
+            </tr>`
+        })
+        .join("")
+    : `<tr><td style="padding: 12px 0; color: #666; font-size: 14px;">No upcoming mics in the next 7 days.</td></tr>`
+
+  await resend.emails.send({
+    from: process.env.RESEND_FROM_EMAIL ?? "Mic Drop <noreply@yourdomain.com>",
+    to,
+    subject: `Mic Drop weekly digest — ${new Date().toLocaleDateString("en-US", { month: "long", day: "numeric" })}`,
+    html: `
+      <div style="font-family: sans-serif; max-width: 520px; margin: 0 auto; padding: 32px 24px; background: #1a1a2e; color: #f8f8f8; border-radius: 12px;">
+        <h1 style="font-size: 28px; font-weight: 800; margin: 0 0 4px;">
+          Mic<span style="color: #e879a0;">Drop</span>
+        </h1>
+        <p style="color: #aaa; margin: 0 0 32px; font-size: 14px;">Weekly digest</p>
+
+        <h2 style="font-size: 16px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: #aaa; margin: 0 0 16px;">This week</h2>
+        <table style="width: 100%; border-collapse: collapse; margin: 0 0 32px;">
+          <tr>
+            <td style="padding: 10px 0; border-bottom: 1px solid #222; font-size: 15px;">New mics created</td>
+            <td style="padding: 10px 0; border-bottom: 1px solid #222; font-size: 20px; font-weight: 800; text-align: right; color: #e879a0;">${stats.micsThisWeek}</td>
+          </tr>
+          <tr>
+            <td style="padding: 10px 0; border-bottom: 1px solid #222; font-size: 15px;">New sign-ups</td>
+            <td style="padding: 10px 0; border-bottom: 1px solid #222; font-size: 20px; font-weight: 800; text-align: right; color: #e879a0;">${stats.signupsThisWeek}</td>
+          </tr>
+        </table>
+
+        <h2 style="font-size: 16px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: #aaa; margin: 0 0 16px;">All time</h2>
+        <table style="width: 100%; border-collapse: collapse; margin: 0 0 32px;">
+          <tr>
+            <td style="padding: 10px 0; border-bottom: 1px solid #222; font-size: 15px;">Total mics</td>
+            <td style="padding: 10px 0; border-bottom: 1px solid #222; font-size: 20px; font-weight: 800; text-align: right; color: #f8f8f8;">${stats.totalMics}</td>
+          </tr>
+          <tr>
+            <td style="padding: 10px 0; border-bottom: 1px solid #222; font-size: 15px;">Total sign-ups</td>
+            <td style="padding: 10px 0; border-bottom: 1px solid #222; font-size: 20px; font-weight: 800; text-align: right; color: #f8f8f8;">${stats.totalSignups}</td>
+          </tr>
+          <tr>
+            <td style="padding: 10px 0; border-bottom: 1px solid #222; font-size: 15px;">Performers with email</td>
+            <td style="padding: 10px 0; border-bottom: 1px solid #222; font-size: 20px; font-weight: 800; text-align: right; color: #f8f8f8;">${stats.totalWithEmail}</td>
+          </tr>
+          <tr>
+            <td style="padding: 10px 0; font-size: 15px;">Waitlist entries</td>
+            <td style="padding: 10px 0; font-size: 20px; font-weight: 800; text-align: right; color: #f8f8f8;">${stats.totalWaitlist}</td>
+          </tr>
+        </table>
+
+        <h2 style="font-size: 16px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: #aaa; margin: 0 0 16px;">Upcoming (next 7 days)</h2>
+        <table style="width: 100%; border-collapse: collapse; margin: 0 0 32px;">
+          ${upcomingRows}
+        </table>
+
+        <p style="margin: 0; font-size: 12px; color: #444;">
+          Sent every Monday morning by Mic Drop.
+        </p>
+      </div>
+    `,
+  })
+}
+
 export async function sendHostPinEmail({
   to,
   micName,
