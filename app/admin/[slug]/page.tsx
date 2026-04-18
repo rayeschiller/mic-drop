@@ -3,6 +3,7 @@ import { notFound, redirect } from "next/navigation"
 import { Mic2, ArrowLeft, MapPin, CalendarDays, Clock, Mail, Instagram, Timer } from "lucide-react"
 import { getAdminMicDetail, checkAdminAuth } from "../actions"
 import { DeleteMicButton } from "./delete-button"
+import { SendRemindersButton } from "./send-reminders-button"
 
 function formatDate(dateString: string): string {
   const date = new Date(dateString + "T00:00:00")
@@ -60,6 +61,7 @@ export default async function AdminMicPage({ params }: { params: Promise<{ slug:
               >
                 View public page →
               </Link>
+              <SendRemindersButton slug={mic.slug} />
               <DeleteMicButton slug={mic.slug} name={mic.name} />
             </div>
           </div>

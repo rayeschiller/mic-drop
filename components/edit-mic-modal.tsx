@@ -52,6 +52,7 @@ interface MicEditData {
   seriesName?: string | null
   signupOpensAt?: string | null
   sendReminders?: boolean
+  sendTwoDayReminder?: boolean
 }
 
 type MicSaveData = Omit<MicEditData, "sections"> & { sections?: SectionInput[] }
@@ -173,7 +174,7 @@ export function EditMicModal({
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent className="bg-card border-border sm:max-w-lg max-h-[90vh] overflow-y-auto">
+      <DialogContent className="bg-card border-border sm:max-w-3xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="text-foreground flex items-center gap-2">
             <Pencil className="h-5 w-5 text-primary" />
@@ -468,7 +469,22 @@ export function EditMicModal({
             onChange={(val) => setFormData((prev) => ({ ...prev, signupOpensAt: val }))}
           />
 
-          <div className="rounded-lg border border-border/50 bg-secondary/10 p-3">
+          <div className="rounded-lg border border-border/50 bg-secondary/10 p-3 space-y-3">
+            <span className="text-sm font-medium">Reminder emails</span>
+            <label className="flex items-center gap-3 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={formData.sendTwoDayReminder ?? false}
+                onChange={(e) => setFormData((prev) => ({ ...prev, sendTwoDayReminder: e.target.checked }))}
+                className="h-4 w-4 accent-neon-pink"
+              />
+              <div>
+                <span className="text-sm font-bold">2 days before</span>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Email everyone on the lineup 2 days before the show.
+                </p>
+              </div>
+            </label>
             <label className="flex items-center gap-3 cursor-pointer">
               <input
                 type="checkbox"
@@ -477,9 +493,9 @@ export function EditMicModal({
                 className="h-4 w-4 accent-neon-pink"
               />
               <div>
-                <span className="text-sm font-bold">Send reminder emails</span>
+                <span className="text-sm font-bold">Day of show</span>
                 <p className="text-xs text-muted-foreground mt-0.5">
-                  Automatically email everyone on the lineup the day of the show at 7am EST / 4am PST.
+                  Email everyone on the lineup the day of the show at 7am EST / 4am PST.
                 </p>
               </div>
             </label>

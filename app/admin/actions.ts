@@ -1,6 +1,7 @@
 "use server"
 
 import { createAdminClient } from "@/lib/supabase/admin"
+import { sendPerformerReminderEmails, sendWaitlistReminderEmails } from "@/lib/email"
 import { cookies } from "next/headers"
 import crypto from "crypto"
 
@@ -78,6 +79,114 @@ export async function deleteMic(slug: string): Promise<{ success: boolean; error
   const admin = createAdminClient()
   const { error } = await admin.from("mics").delete().eq("slug", slug)
   if (error) return { success: false, error: error.message }
+  return { success: true }
+}
+
+function getReminderTimeLabel(date: string, startTime: string): string {
+  const dateOnly = date.slice(0, 10)           // "YYYY-MM-DD"
+  const timeOnly = startTime.slice(0, 5)       // "HH:MM" — strips seconds if present
+  const startMs = new Date(`${dateOnly}T${timeOnly}:00Z`).getTime()
+  const diffMs = startMs - Date.now()
+  const diffHours = Math.round(diffMs / (1000 * 60 * 60))
+  const diffDays = Math.round(diffMs / (1000 * 60 * 60 * 24))
+  if (diffMs <= 0) return "today"
+  if (diffDays >= 2) return `${diffDays} days`
+  if (diffHours >= 1) return `${diffHours} hours`
+  return "today"
+}
+
+async function getMicAndPerformers(slug: string) {
+  const admin = createAdminClient()
+
+  const { data: mic } = await admin
+    .from("mics")
+    .select("id, slug, name, venue, date, start_time")
+    .eq("slug", slug)
+    .single()
+
+  if (!mic) return null
+
+  const [{ data: slots }, { data: waitlistEntries }] = await Promise.all([
+    admin.from("slots").select("performer_name, performer_email").eq("mic_id", mic.id).eq("taken", true).not("performer_email", "is", null),
+    admin.from("waitlist_entries").select("performer_name, performer_email").eq("mic_id", mic.id).order("created_at", { ascending: true }),
+  ])
+
+  const performers = (slots ?? [])
+    .filter((s) => s.performer_email)
+    .map((s) => ({ name: s.performer_name ?? "Performer", email: s.performer_email! }))
+
+  const waitlist = (waitlistEntries ?? [])
+    .filter((w) => w.performer_email)
+    .map((w, i) => ({ name: w.performer_name ?? "Performer", email: w.performer_email!, position: i + 1 }))
+
+  const timeLabel = getReminderTimeLabel(mic.date, mic.start_time)
+
+  return { mic, performers, waitlist, timeLabel }
+}
+
+export async function getMicReminderPreview(slug: string): Promise<{
+  success: boolean
+  performers: { name: string; email: string }[]
+  waitlist: { name: string; email: string; position: number }[]
+  lineupSubject: string
+  waitlistSubject: string
+  timeLabel: string
+  error?: string
+}> {
+  const authed = await checkAdminAuth()
+  const empty = { success: false, performers: [], waitlist: [], lineupSubject: "", waitlistSubject: "", timeLabel: "" }
+  if (!authed) return { ...empty, error: "Unauthorized" }
+
+  const data = await getMicAndPerformers(slug)
+  if (!data) return { ...empty, error: "Mic not found" }
+
+  const { performers, waitlist, timeLabel, mic } = data
+  return {
+    success: true,
+    performers,
+    waitlist,
+    lineupSubject: `Reminder — ${mic.name} is in ${timeLabel}`,
+    waitlistSubject: `Reminder — ${mic.name} is in ${timeLabel} (you're on the waitlist)`,
+    timeLabel,
+  }
+}
+
+export async function sendMicReminders(slug: string, target: "lineup" | "waitlist"): Promise<{ success: boolean; sent: number; error?: string }> {
+  const authed = await checkAdminAuth()
+  if (!authed) return { success: false, sent: 0, error: "Unauthorized" }
+
+  const data = await getMicAndPerformers(slug)
+  if (!data) return { success: false, sent: 0, error: "Mic not found" }
+
+  const { mic, performers, waitlist, timeLabel } = data
+
+  if (target === "lineup") {
+    if (performers.length === 0) return { success: true, sent: 0 }
+    await sendPerformerReminderEmails({ performers, micName: mic.name, micSlug: mic.slug, venue: mic.venue, date: mic.date, startTime: mic.start_time, timeLabel })
+    return { success: true, sent: performers.length }
+  } else {
+    if (waitlist.length === 0) return { success: true, sent: 0 }
+    await sendWaitlistReminderEmails({ performers: waitlist, micName: mic.name, micSlug: mic.slug, venue: mic.venue, date: mic.date, startTime: mic.start_time, timeLabel })
+    return { success: true, sent: waitlist.length }
+  }
+}
+
+export async function sendTestReminderEmail(slug: string, toEmail: string, target: "lineup" | "waitlist"): Promise<{ success: boolean; error?: string }> {
+  const authed = await checkAdminAuth()
+  if (!authed) return { success: false, error: "Unauthorized" }
+
+  const data = await getMicAndPerformers(slug)
+  if (!data) return { success: false, error: "Mic not found" }
+
+  const { mic, timeLabel } = data
+  const testPerformer = [{ name: "You", email: toEmail, position: 1 }]
+
+  if (target === "lineup") {
+    await sendPerformerReminderEmails({ performers: testPerformer, micName: mic.name, micSlug: mic.slug, venue: mic.venue, date: mic.date, startTime: mic.start_time, timeLabel })
+  } else {
+    await sendWaitlistReminderEmails({ performers: testPerformer, micName: mic.name, micSlug: mic.slug, venue: mic.venue, date: mic.date, startTime: mic.start_time, timeLabel })
+  }
+
   return { success: true }
 }
 

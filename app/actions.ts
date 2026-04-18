@@ -65,6 +65,7 @@ export interface MicData {
   seriesName: string | null
   signupOpensAt: string | null
   sendReminders: boolean
+  sendTwoDayReminder: boolean
   waitlistCount: number
   waitlist?: WaitlistEntry[]  // only populated in host mode
 }
@@ -284,6 +285,7 @@ function buildMicData(
     seriesName: mic.series_name as string | null,
     signupOpensAt: mic.signup_opens_at as string | null,
     sendReminders: (mic.send_reminders as boolean) ?? false,
+    sendTwoDayReminder: (mic.send_two_day_reminder as boolean) ?? false,
     waitlistCount,
     waitlist,
   }
@@ -585,6 +587,7 @@ export async function hostUpdateMic(
     sections?: SectionInput[]
     signupOpensAt?: string | null
     sendReminders?: boolean
+    sendTwoDayReminder?: boolean
   }
 ): Promise<{ success: boolean; newSlug?: string; error?: string }> {
   const verified = await verifyHostPin(micSlug, pin)
@@ -629,6 +632,7 @@ export async function hostUpdateMic(
       series_name: data.seriesName !== undefined ? data.seriesName : undefined,
       signup_opens_at: data.signupOpensAt !== undefined ? data.signupOpensAt : undefined,
       send_reminders: data.sendReminders !== undefined ? data.sendReminders : undefined,
+      send_two_day_reminder: data.sendTwoDayReminder !== undefined ? data.sendTwoDayReminder : undefined,
     })
     .eq("id", mic.id)
 

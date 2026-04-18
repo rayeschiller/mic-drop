@@ -54,11 +54,11 @@ export function ImageUpload({ value, onChange }: ImageUploadProps) {
 
   if (value) {
     return (
-      <div className="relative group rounded-xl overflow-hidden border-2 border-border">
+      <div className="relative group rounded-xl overflow-hidden border-2 border-border flex justify-center bg-secondary/10">
         <img
           src={value}
           alt="Mic flyer"
-          className="w-full h-auto object-contain"
+          className="max-h-48 w-auto object-contain"
         />
         <button
           type="button"

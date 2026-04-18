@@ -375,6 +375,7 @@ export function MicPageClient({ slug }: { slug: string }) {
     sections?: SectionInput[]
     signupOpensAt?: string | null
     sendReminders?: boolean
+    sendTwoDayReminder?: boolean
   }) => {
     if (!hostPin) return
     const result = await hostUpdateMic(slug, hostPin, data)
@@ -579,17 +580,17 @@ export function MicPageClient({ slug }: { slug: string }) {
 
                   <div className="mt-8 flex flex-col gap-3 text-foreground">
                     <div className="flex items-center gap-3">
-                      <MapPin className="h-5 w-5 text-white flex-shrink-0" />
+                      <MapPin className="h-5 w-5 text-foreground flex-shrink-0" />
                       <span className="text-lg">{mic.venue}</span>
                     </div>
 
                     <div className="flex items-center gap-3">
-                      <CalendarDays className="h-5 w-5 text-white flex-shrink-0" />
+                      <CalendarDays className="h-5 w-5 text-foreground flex-shrink-0" />
                       <span className="text-lg">{formatDate(mic.date)}</span>
                     </div>
 
                     <div className="flex items-center gap-3">
-                      <Clock className="h-5 w-5 text-white flex-shrink-0" />
+                      <Clock className="h-5 w-5 text-foreground flex-shrink-0" />
                       <span className="text-lg">
                         {formatTime(displayStartTime)}{displayEndTime ? ` - ${formatTime(displayEndTime)}` : ""}
                         {hasSections && mic.sections.length > 1 && (
@@ -875,6 +876,7 @@ export function MicPageClient({ slug }: { slug: string }) {
             seriesName: mic.seriesName,
             signupOpensAt: mic.signupOpensAt,
             sendReminders: mic.sendReminders,
+            sendTwoDayReminder: mic.sendTwoDayReminder,
           }}
           currentFilledSlots={filledSlots}
           onSave={handleEditSave}
