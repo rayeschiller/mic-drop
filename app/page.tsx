@@ -1,7 +1,6 @@
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Mic2, Plus, Sparkles } from "lucide-react"
-import { NearbyMics } from "@/components/nearby-mics"
 
 export default function HomePage() {
   return (
@@ -120,8 +119,6 @@ export default function HomePage() {
           </div>
         </div>
       </section>
-
-      <NearbyMics />
 
       {/* Footer */}
       <footer className="border-t border-border">

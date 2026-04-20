@@ -3,7 +3,6 @@
 import { createAdminClient } from "@/lib/supabase/admin"
 import { createClient } from "@/lib/supabase/server"
 import { sendHostPinEmail, sendWaitlistConfirmationEmail, sendWaitlistPromotionEmail } from "@/lib/email"
-import { geocodeVenue, haversineDistanceMiles } from "@/lib/geocode"
 import crypto from "crypto"
 
 // --- Helpers ---
@@ -207,13 +206,6 @@ export async function createMic(formData: {
       return { success: false, error: "Failed to create slots" }
     }
   }
-
-  // Geocode venue (non-blocking)
-  geocodeVenue(formData.venue).then((coords) => {
-    if (coords) {
-      admin.from("mics").update({ lat: coords.lat, lng: coords.lng }).eq("id", mic.id).then(() => {})
-    }
-  }).catch(() => {})
 
   // Send host PIN email if provided (non-blocking)
   if (formData.hostEmail) {
@@ -683,43 +675,7 @@ export async function hostUpdateMic(
     }
   }
 
-  // Re-geocode if venue changed (non-blocking)
-  if (data.venue) {
-    geocodeVenue(data.venue).then((coords) => {
-      if (coords) {
-        admin.from("mics").update({ lat: coords.lat, lng: coords.lng }).eq("id", mic.id).then(() => {})
-      }
-    }).catch(() => {})
-  }
-
   return { success: true, newSlug: newSlug !== micSlug ? newSlug : undefined }
-}
-
-export async function getMicsNearLocation(lat: number, lng: number, radiusMiles = 25) {
-  const admin = createAdminClient()
-  const today = new Date().toISOString().split("T")[0]
-
-  const { data: mics } = await admin
-    .from("mics")
-    .select("slug, name, venue, date, start_time, lat, lng")
-    .gte("date", today)
-    .not("lat", "is", null)
-    .not("lng", "is", null)
-    .order("date", { ascending: true })
-
-  if (!mics) return []
-
-  return mics
-    .map((mic) => ({
-      slug: mic.slug as string,
-      name: mic.name as string,
-      venue: mic.venue as string,
-      date: mic.date as string,
-      startTime: mic.start_time as string,
-      distanceMiles: haversineDistanceMiles(lat, lng, mic.lat as number, mic.lng as number),
-    }))
-    .filter((mic) => mic.distanceMiles <= radiusMiles)
-    .sort((a, b) => a.distanceMiles - b.distanceMiles)
 }
 
 async function updateSections(
