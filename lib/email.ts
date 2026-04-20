@@ -2,6 +2,14 @@ import { Resend } from "resend"
 
 const resend = new Resend(process.env.RESEND_API_KEY)
 
+// Canonical site URL for email links. Falls back to the production host
+// so broken NEXT_PUBLIC_SITE_URL env doesn't send undefined/slug links.
+const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL || "https://mics.rayeschiller.com").replace(/\/$/, "")
+
+function micLink(micSlug: string): string {
+  return `${SITE_URL}/${micSlug}`
+}
+
 function formatTime(timeString: string): string {
   const [hours, minutes] = timeString.split(":")
   const hour = parseInt(hours)
@@ -35,7 +43,7 @@ export async function sendPerformerReminderEmails({
   startTime: string
   timeLabel?: string
 }) {
-  const micUrl = `${process.env.NEXT_PUBLIC_SITE_URL}/${micSlug}`
+  const micUrl = micLink(micSlug)
   const dateFormatted = formatDate(date)
   const timeFormatted = formatTime(startTime)
 
@@ -93,7 +101,7 @@ export async function sendTwoDayReminderEmails({
   date: string
   startTime: string
 }) {
-  const micUrl = `${process.env.NEXT_PUBLIC_SITE_URL}/${micSlug}`
+  const micUrl = micLink(micSlug)
   const dateFormatted = formatDate(date)
   const timeFormatted = formatTime(startTime)
 
@@ -151,7 +159,7 @@ export async function sendWeekReminderEmails({
   date: string
   startTime: string
 }) {
-  const micUrl = `${process.env.NEXT_PUBLIC_SITE_URL}/${micSlug}`
+  const micUrl = micLink(micSlug)
   const dateFormatted = formatDate(date)
   const timeFormatted = formatTime(startTime)
 
@@ -213,7 +221,7 @@ export async function sendWaitlistConfirmationEmail({
   startTime: string
   position: number
 }) {
-  const micUrl = `${process.env.NEXT_PUBLIC_SITE_URL}/${micSlug}`
+  const micUrl = micLink(micSlug)
   const dateFormatted = formatDate(date)
   const timeFormatted = formatTime(startTime)
 
@@ -274,7 +282,7 @@ export async function sendWaitlistPromotionEmail({
   date: string
   startTime: string
 }) {
-  const micUrl = `${process.env.NEXT_PUBLIC_SITE_URL}/${micSlug}`
+  const micUrl = micLink(micSlug)
   const dateFormatted = formatDate(date)
   const timeFormatted = formatTime(startTime)
 
@@ -333,7 +341,7 @@ export async function sendWaitlistReminderEmails({
   startTime: string
   timeLabel?: string
 }) {
-  const micUrl = `${process.env.NEXT_PUBLIC_SITE_URL}/${micSlug}`
+  const micUrl = micLink(micSlug)
   const dateFormatted = formatDate(date)
   const timeFormatted = formatTime(startTime)
 
@@ -342,7 +350,7 @@ export async function sendWaitlistReminderEmails({
       resend.emails.send({
         from: process.env.RESEND_FROM_EMAIL ?? "Mic Drop <noreply@yourdomain.com>",
         to: email,
-        subject: `Reminder — ${micName} is in ${timeLabel} (you're #${position} on the waitlist)`,
+        subject: `Reminder — ${micName} is ${timeLabel} (you're #${position} on the waitlist)`,
         html: `
           <div style="font-family: sans-serif; max-width: 480px; margin: 0 auto; padding: 32px 24px; background: #1a1a2e; color: #f8f8f8; border-radius: 12px;">
             <h1 style="font-size: 28px; font-weight: 800; margin: 0 0 8px;">
@@ -405,7 +413,7 @@ export async function sendWeeklyDigestEmail({
     totalSlots: number
   }[]
 }) {
-  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? ""
+  const siteUrl = SITE_URL
 
   const upcomingRows = upcomingMics.length
     ? upcomingMics
@@ -491,7 +499,7 @@ export async function sendHostPinEmail({
   micSlug: string
   hostPin: string
 }) {
-  const micUrl = `${process.env.NEXT_PUBLIC_SITE_URL}/${micSlug}`
+  const micUrl = micLink(micSlug)
 
   await resend.emails.send({
     from: process.env.RESEND_FROM_EMAIL ?? "Mic Drop <noreply@yourdomain.com>",

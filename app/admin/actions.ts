@@ -2,6 +2,7 @@
 
 import { createAdminClient } from "@/lib/supabase/admin"
 import { sendPerformerReminderEmails, sendWaitlistReminderEmails } from "@/lib/email"
+import { micStartMs, reminderDayLabel } from "@/lib/time"
 import { cookies } from "next/headers"
 import crypto from "crypto"
 
@@ -82,17 +83,18 @@ export async function deleteMic(slug: string): Promise<{ success: boolean; error
   return { success: true }
 }
 
-function getReminderTimeLabel(date: string, startTime: string): string {
-  const dateOnly = date.slice(0, 10)           // "YYYY-MM-DD"
-  const timeOnly = startTime.slice(0, 5)       // "HH:MM" — strips seconds if present
-  const startMs = new Date(`${dateOnly}T${timeOnly}:00Z`).getTime()
+// Returns a natural-language label that reads correctly after "is":
+//   "today", "tomorrow", "in 2 days", "in 23 hours", "soon"
+function getReminderTimeLabel(date: string, startTime: string, timezone: string | null): string {
+  const startMs = micStartMs(date, startTime, timezone)
   const diffMs = startMs - Date.now()
   const diffHours = Math.round(diffMs / (1000 * 60 * 60))
   const diffDays = Math.round(diffMs / (1000 * 60 * 60 * 24))
-  if (diffMs <= 0) return "today"
-  if (diffDays >= 2) return `${diffDays} days`
-  if (diffHours >= 1) return `${diffHours} hours`
-  return "today"
+  if (diffMs <= 0) return reminderDayLabel(date, timezone)
+  if (diffDays >= 2) return `in ${diffDays} days`
+  if (diffHours >= 24) return reminderDayLabel(date, timezone) // "today" / "tomorrow"
+  if (diffHours >= 1) return `in ${diffHours} hours`
+  return reminderDayLabel(date, timezone)
 }
 
 async function getMicAndPerformers(slug: string) {
@@ -100,7 +102,7 @@ async function getMicAndPerformers(slug: string) {
 
   const { data: mic } = await admin
     .from("mics")
-    .select("id, slug, name, venue, date, start_time")
+    .select("id, slug, name, venue, date, start_time, timezone")
     .eq("slug", slug)
     .single()
 
@@ -119,7 +121,7 @@ async function getMicAndPerformers(slug: string) {
     .filter((w) => w.performer_email)
     .map((w, i) => ({ name: w.performer_name ?? "Performer", email: w.performer_email!, position: i + 1 }))
 
-  const timeLabel = getReminderTimeLabel(mic.date, mic.start_time)
+  const timeLabel = getReminderTimeLabel(mic.date, mic.start_time, mic.timezone)
 
   return { mic, performers, waitlist, timeLabel }
 }
@@ -145,8 +147,8 @@ export async function getMicReminderPreview(slug: string): Promise<{
     success: true,
     performers,
     waitlist,
-    lineupSubject: `Reminder — ${mic.name} is in ${timeLabel}`,
-    waitlistSubject: `Reminder — ${mic.name} is in ${timeLabel} (you're on the waitlist)`,
+    lineupSubject: `Reminder — ${mic.name} is ${timeLabel}`,
+    waitlistSubject: `Reminder — ${mic.name} is ${timeLabel} (you're on the waitlist)`,
     timeLabel,
   }
 }
