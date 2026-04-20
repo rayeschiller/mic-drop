@@ -28,7 +28,7 @@ export async function GET(request: Request) {
   const WINDOW = 30 * 60 * 1000
 
   const dueMics = (mics ?? []).filter((mic) => {
-    const startMs = new Date(`${mic.date}T${mic.start_time}:00Z`).getTime()
+    const startMs = new Date(`${mic.date}T${mic.start_time}Z`).getTime()
     const diff = startMs - now
     return diff >= SIX_HOURS - WINDOW && diff <= SIX_HOURS + WINDOW
   })

@@ -102,7 +102,7 @@ export async function sendTwoDayReminderEmails({
       resend.emails.send({
         from: process.env.RESEND_FROM_EMAIL ?? "Mic Drop <noreply@yourdomain.com>",
         to: email,
-        subject: `Reminder — ${micName} is in 2 days`,
+        subject: `Reminder — ${micName} · ${dateFormatted}`,
         html: `
           <div style="font-family: sans-serif; max-width: 480px; margin: 0 auto; padding: 32px 24px; background: #1a1a2e; color: #f8f8f8; border-radius: 12px;">
             <h1 style="font-size: 28px; font-weight: 800; margin: 0 0 8px;">
@@ -160,7 +160,7 @@ export async function sendWeekReminderEmails({
       resend.emails.send({
         from: process.env.RESEND_FROM_EMAIL ?? "Mic Drop <noreply@yourdomain.com>",
         to: email,
-        subject: `Reminder — ${micName} is in 1 week`,
+        subject: `Reminder — ${micName} · ${dateFormatted}`,
         html: `
           <div style="font-family: sans-serif; max-width: 480px; margin: 0 auto; padding: 32px 24px; background: #1a1a2e; color: #f8f8f8; border-radius: 12px;">
             <h1 style="font-size: 28px; font-weight: 800; margin: 0 0 8px;">
