@@ -2,9 +2,7 @@ import { Resend } from "resend"
 
 const resend = new Resend(process.env.RESEND_API_KEY)
 
-// Canonical site URL for email links. Falls back to the production host
-// so broken NEXT_PUBLIC_SITE_URL env doesn't send undefined/slug links.
-const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL || "https://mics.rayeschiller.com").replace(/\/$/, "")
+const SITE_URL = "https://mics.rayeschiller.com"
 
 function micLink(micSlug: string): string {
   return `${SITE_URL}/${micSlug}`
