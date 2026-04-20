@@ -44,13 +44,13 @@ export async function sendPerformerReminderEmails({
       resend.emails.send({
         from: process.env.RESEND_FROM_EMAIL ?? "Mic Drop <noreply@yourdomain.com>",
         to: email,
-        subject: `Reminder — ${micName} is in ${timeLabel}`,
+        subject: `Reminder — ${micName} is ${timeLabel}`,
         html: `
           <div style="font-family: sans-serif; max-width: 480px; margin: 0 auto; padding: 32px 24px; background: #1a1a2e; color: #f8f8f8; border-radius: 12px;">
             <h1 style="font-size: 28px; font-weight: 800; margin: 0 0 8px;">
               Mic<span style="color: #e879a0;">Drop</span>
             </h1>
-            <p style="color: #aaa; margin: 0 0 32px;">Reminder — your mic is in ${timeLabel}.</p>
+            <p style="color: #aaa; margin: 0 0 32px;">Reminder — your mic is ${timeLabel}.</p>
 
             <h2 style="font-size: 22px; font-weight: 700; margin: 0 0 16px;">${micName}</h2>
 
@@ -61,7 +61,7 @@ export async function sendPerformerReminderEmails({
             </div>
 
             <p style="font-size: 16px; color: #f8f8f8; margin: 0 0 24px;">
-              Hey ${name} — you're on the list tonight! 
+              Hey ${name} — you're on the list. See you at ${timeFormatted}!
             </p>
 
             <a href="${micUrl}" style="display: inline-block; padding: 12px 24px; background: #e879a0; color: #fff; text-decoration: none; border-radius: 8px; font-weight: 700; font-size: 15px;">

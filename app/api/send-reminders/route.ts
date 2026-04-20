@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { sendPerformerReminderEmails } from "@/lib/email"
+import { micStartMs, reminderDayLabel } from "@/lib/time"
 
 export async function GET(request: Request) {
   const authHeader = request.headers.get("authorization")
@@ -13,7 +14,7 @@ export async function GET(request: Request) {
   // Fetch all mics that haven't had reminders sent yet
   const { data: mics, error } = await admin
     .from("mics")
-    .select("id, slug, name, venue, date, start_time")
+    .select("id, slug, name, venue, date, start_time, timezone")
     .eq("reminders_sent", false)
     .eq("send_reminders", true)
 
@@ -21,14 +22,15 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: error.message }, { status: 500 })
   }
 
-  // Filter to mics whose start time is within the 6-hour window (±30 min)
-  // Note: stored date+start_time is treated as UTC for this comparison
+  // Filter to mics whose start time is within the 6-hour window (±30 min).
+  // `mic.timezone` is the host's IANA zone at mic creation (e.g. America/New_York);
+  // micStartMs converts (date + start_time) in that zone to real UTC millis.
   const now = Date.now()
   const SIX_HOURS = 6 * 60 * 60 * 1000
   const WINDOW = 30 * 60 * 1000
 
   const dueMics = (mics ?? []).filter((mic) => {
-    const startMs = new Date(`${mic.date}T${mic.start_time}Z`).getTime()
+    const startMs = micStartMs(mic.date, mic.start_time, mic.timezone)
     const diff = startMs - now
     return diff >= SIX_HOURS - WINDOW && diff <= SIX_HOURS + WINDOW
   })
@@ -55,6 +57,9 @@ export async function GET(request: Request) {
         venue: mic.venue,
         date: mic.date,
         startTime: mic.start_time,
+        // "today" for evening mics, "tomorrow" for very early morning mics
+        // whose 6h window crosses the prior local day.
+        timeLabel: reminderDayLabel(mic.date, mic.timezone, now),
       })
       totalSent += performers.length
     }

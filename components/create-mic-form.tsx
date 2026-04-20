@@ -162,6 +162,12 @@ export function CreateMicForm() {
     const seriesSlug = isRecurring ? `${toSlug(formData.name)}-${Math.random().toString(36).substring(2, 6)}` : undefined
     const seriesName = isRecurring ? formData.name : undefined
 
+    // Capture the host's IANA timezone so reminder crons can convert
+    // (date + start_time) into a correct UTC instant regardless of where they live.
+    const timezone =
+      (typeof Intl !== "undefined" && Intl.DateTimeFormat().resolvedOptions().timeZone) ||
+      "America/Los_Angeles"
+
     const result = await createMic({
       ...formData,
       slug: slug || undefined,
@@ -173,6 +179,7 @@ export function CreateMicForm() {
       sections: sectionPayload,
       signupOpensAt: signupOpensAt || undefined,
       sendReminders,
+      timezone,
     })
 
     if (!result.success || !result.slug || !result.hostPin) {
@@ -198,6 +205,7 @@ export function CreateMicForm() {
           sections: sectionPayload,
           signupOpensAt: signupOpensAt || undefined,
           sendReminders,
+          timezone,
         })
         if (extra.success) count++
       }

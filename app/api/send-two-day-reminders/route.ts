@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { sendTwoDayReminderEmails } from "@/lib/email"
+import { micStartMs } from "@/lib/time"
 
 export async function GET(request: Request) {
   const authHeader = request.headers.get("authorization")
@@ -12,7 +13,7 @@ export async function GET(request: Request) {
 
   const { data: mics, error } = await admin
     .from("mics")
-    .select("id, slug, name, venue, date, start_time")
+    .select("id, slug, name, venue, date, start_time, timezone")
     .eq("two_day_reminder_sent", false)
     .eq("send_two_day_reminder", true)
 
@@ -20,13 +21,14 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: error.message }, { status: 500 })
   }
 
-  // Mics whose event is within ±12 hours of exactly 2 days from now.
+  // Mics whose event is within ±12 hours of exactly 2 days from now,
+  // evaluated in the mic's own timezone (see lib/time.ts).
   const now = Date.now()
   const TWO_DAYS = 2 * 24 * 60 * 60 * 1000
   const WINDOW = 12 * 60 * 60 * 1000
 
   const dueMics = (mics ?? []).filter((mic) => {
-    const startMs = new Date(`${mic.date}T${mic.start_time}Z`).getTime()
+    const startMs = micStartMs(mic.date, mic.start_time, mic.timezone)
     const diff = startMs - now
     return diff >= TWO_DAYS - WINDOW && diff <= TWO_DAYS + WINDOW
   })

@@ -378,7 +378,11 @@ export function MicPageClient({ slug }: { slug: string }) {
     sendTwoDayReminder?: boolean
   }) => {
     if (!hostPin) return
-    const result = await hostUpdateMic(slug, hostPin, data)
+    // Re-capture the editor's IANA timezone so reminder crons stay aligned.
+    const timezone =
+      (typeof Intl !== "undefined" && Intl.DateTimeFormat().resolvedOptions().timeZone) ||
+      undefined
+    const result = await hostUpdateMic(slug, hostPin, { ...data, timezone })
     if (result.success) {
       if (result.newSlug) {
         router.push(`/${result.newSlug}`)

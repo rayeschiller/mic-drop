@@ -2,19 +2,19 @@
   "crons": [
     {
       "path": "/api/send-reminders",
-      "schedule": "0 14 * * *"
+      "schedule": "0 15 * * *"
     },
     {
       "path": "/api/send-week-reminders",
-      "schedule": "0 14 * * *"
+      "schedule": "0 15 * * *"
     },
     {
       "path": "/api/send-two-day-reminders",
-      "schedule": "0 14 * * *"
+      "schedule": "0 15 * * *"
     },
     {
       "path": "/api/send-weekly-digest",
-      "schedule": "0 9 * * 1"
+      "schedule": "0 15 * * 1"
     }
   ]
 }
