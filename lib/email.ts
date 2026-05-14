@@ -24,6 +24,47 @@ function formatDate(dateString: string): string {
   })
 }
 
+// Build a Google Calendar "add event" URL.
+// `date` is YYYY-MM-DD; `startTime`/`endTime` are HH:MM in the mic's local zone.
+// If endTime is missing we default to 2 hours after start.
+function googleCalendarUrl({
+  title,
+  date,
+  startTime,
+  endTime,
+  timezone,
+  location,
+  details,
+}: {
+  title: string
+  date: string
+  startTime: string
+  endTime: string | null
+  timezone: string | null
+  location: string
+  details: string
+}): string {
+  const compact = (d: string, t: string) => `${d.replace(/-/g, "")}T${t.replace(":", "")}00`
+  const start = compact(date, startTime)
+  let end: string
+  if (endTime) {
+    end = compact(date, endTime)
+  } else {
+    const [h, m] = startTime.split(":").map(Number)
+    const endH = (h + 2) % 24
+    end = compact(date, `${String(endH).padStart(2, "0")}:${String(m).padStart(2, "0")}`)
+  }
+  const params = new URLSearchParams({
+    action: "TEMPLATE",
+    text: title,
+    dates: `${start}/${end}`,
+    location,
+    details,
+  })
+  if (timezone) params.set("ctz", timezone)
+  return `https://calendar.google.com/calendar/render?${params.toString()}`
+}
+
 export async function sendPerformerReminderEmails({
   performers,
   micName,
@@ -45,13 +86,12 @@ export async function sendPerformerReminderEmails({
   const dateFormatted = formatDate(date)
   const timeFormatted = formatTime(startTime)
 
-  await Promise.allSettled(
-    performers.map(({ name, email }) =>
-      resend.emails.send({
-        from: process.env.RESEND_FROM_EMAIL ?? "Mic Drop <noreply@yourdomain.com>",
-        to: email,
-        subject: `Reminder — ${micName} is ${timeLabel}`,
-        html: `
+  await resend.batch.send(
+    performers.map(({ name, email }) => ({
+      from: process.env.RESEND_FROM_EMAIL ?? "Mic Drop <noreply@yourdomain.com>",
+      to: email,
+      subject: `Reminder — ${micName} is ${timeLabel}`,
+      html: `
           <div style="font-family: sans-serif; max-width: 480px; margin: 0 auto; padding: 32px 24px; background: #1a1a2e; color: #f8f8f8; border-radius: 12px;">
             <h1 style="font-size: 28px; font-weight: 800; margin: 0 0 8px;">
               Mic<span style="color: #e879a0;">Drop</span>
@@ -79,8 +119,7 @@ export async function sendPerformerReminderEmails({
             </p>
           </div>
         `,
-      })
-    )
+    }))
   )
 }
 
@@ -103,13 +142,12 @@ export async function sendTwoDayReminderEmails({
   const dateFormatted = formatDate(date)
   const timeFormatted = formatTime(startTime)
 
-  await Promise.allSettled(
-    performers.map(({ name, email }) =>
-      resend.emails.send({
-        from: process.env.RESEND_FROM_EMAIL ?? "Mic Drop <noreply@yourdomain.com>",
-        to: email,
-        subject: `Reminder — ${micName} · ${dateFormatted}`,
-        html: `
+  await resend.batch.send(
+    performers.map(({ name, email }) => ({
+      from: process.env.RESEND_FROM_EMAIL ?? "Mic Drop <noreply@yourdomain.com>",
+      to: email,
+      subject: `Reminder — ${micName} · ${dateFormatted}`,
+      html: `
           <div style="font-family: sans-serif; max-width: 480px; margin: 0 auto; padding: 32px 24px; background: #1a1a2e; color: #f8f8f8; border-radius: 12px;">
             <h1 style="font-size: 28px; font-weight: 800; margin: 0 0 8px;">
               Mic<span style="color: #e879a0;">Drop</span>
@@ -137,8 +175,7 @@ export async function sendTwoDayReminderEmails({
             </p>
           </div>
         `,
-      })
-    )
+    }))
   )
 }
 
@@ -161,13 +198,12 @@ export async function sendWeekReminderEmails({
   const dateFormatted = formatDate(date)
   const timeFormatted = formatTime(startTime)
 
-  await Promise.allSettled(
-    performers.map(({ name, email }) =>
-      resend.emails.send({
-        from: process.env.RESEND_FROM_EMAIL ?? "Mic Drop <noreply@yourdomain.com>",
-        to: email,
-        subject: `Reminder — ${micName} · ${dateFormatted}`,
-        html: `
+  await resend.batch.send(
+    performers.map(({ name, email }) => ({
+      from: process.env.RESEND_FROM_EMAIL ?? "Mic Drop <noreply@yourdomain.com>",
+      to: email,
+      subject: `Reminder — ${micName} · ${dateFormatted}`,
+      html: `
           <div style="font-family: sans-serif; max-width: 480px; margin: 0 auto; padding: 32px 24px; background: #1a1a2e; color: #f8f8f8; border-radius: 12px;">
             <h1 style="font-size: 28px; font-weight: 800; margin: 0 0 8px;">
               Mic<span style="color: #e879a0;">Drop</span>
@@ -195,8 +231,7 @@ export async function sendWeekReminderEmails({
             </p>
           </div>
         `,
-      })
-    )
+    }))
   )
 }
 
@@ -343,13 +378,12 @@ export async function sendWaitlistReminderEmails({
   const dateFormatted = formatDate(date)
   const timeFormatted = formatTime(startTime)
 
-  await Promise.allSettled(
-    performers.map(({ name, email, position }) =>
-      resend.emails.send({
-        from: process.env.RESEND_FROM_EMAIL ?? "Mic Drop <noreply@yourdomain.com>",
-        to: email,
-        subject: `Reminder — ${micName} is ${timeLabel} (you're #${position} on the waitlist)`,
-        html: `
+  await resend.batch.send(
+    performers.map(({ name, email, position }) => ({
+      from: process.env.RESEND_FROM_EMAIL ?? "Mic Drop <noreply@yourdomain.com>",
+      to: email,
+      subject: `Reminder — ${micName} is ${timeLabel} (you're #${position} on the waitlist)`,
+      html: `
           <div style="font-family: sans-serif; max-width: 480px; margin: 0 auto; padding: 32px 24px; background: #1a1a2e; color: #f8f8f8; border-radius: 12px;">
             <h1 style="font-size: 28px; font-weight: 800; margin: 0 0 8px;">
               Mic<span style="color: #e879a0;">Drop</span>
@@ -382,8 +416,7 @@ export async function sendWaitlistReminderEmails({
             </p>
           </div>
         `,
-      })
-    )
+    }))
   )
 }
 
@@ -481,6 +514,166 @@ export async function sendWeeklyDigestEmail({
         <p style="margin: 0; font-size: 12px; color: #444;">
           Sent every Monday morning by Mic Drop.
         </p>
+      </div>
+    `,
+  })
+}
+
+export async function sendSignupConfirmationEmail({
+  to,
+  performerName,
+  micName,
+  micSlug,
+  venue,
+  date,
+  startTime,
+  endTime,
+  timezone,
+  slotNumber,
+}: {
+  to: string
+  performerName: string
+  micName: string
+  micSlug: string
+  venue: string
+  date: string
+  startTime: string
+  endTime: string | null
+  timezone: string | null
+  slotNumber: number
+}) {
+  const micUrl = micLink(micSlug)
+  const dateFormatted = formatDate(date)
+  const timeFormatted = formatTime(startTime)
+  const calendarUrl = googleCalendarUrl({
+    title: micName,
+    date,
+    startTime,
+    endTime,
+    timezone,
+    location: venue,
+    details: `You're slot #${slotNumber} at ${micName}.\n\nLineup: ${micUrl}`,
+  })
+
+  await resend.emails.send({
+    from: process.env.RESEND_FROM_EMAIL ?? "Mic Drop <noreply@yourdomain.com>",
+    to,
+    subject: `You're on the list — ${micName}`,
+    html: `
+      <div style="font-family: sans-serif; max-width: 480px; margin: 0 auto; padding: 32px 24px; background: #1a1a2e; color: #f8f8f8; border-radius: 12px;">
+        <h1 style="font-size: 28px; font-weight: 800; margin: 0 0 8px;">
+          Mic<span style="color: #e879a0;">Drop</span>
+        </h1>
+        <p style="color: #aaa; margin: 0 0 32px;">You're on the list.</p>
+
+        <h2 style="font-size: 20px; font-weight: 700; margin: 0 0 16px;">${micName}</h2>
+
+        <div style="display: flex; flex-direction: column; gap: 8px; margin: 0 0 24px;">
+          <p style="margin: 0; font-size: 15px;">📍 ${venue}</p>
+          <p style="margin: 0; font-size: 15px;">📅 ${dateFormatted}</p>
+          <p style="margin: 0; font-size: 15px;">🕐 ${timeFormatted}</p>
+        </div>
+
+        <div style="margin: 0 0 24px; padding: 20px; background: #111124; border-radius: 8px; border: 1px solid #333; text-align: center;">
+          <p style="margin: 0 0 4px; font-size: 12px; text-transform: uppercase; letter-spacing: 0.1em; color: #aaa;">Your Slot</p>
+          <p style="margin: 0; font-size: 48px; font-weight: 800; color: #e879a0;">#${slotNumber}</p>
+        </div>
+
+        <p style="font-size: 16px; color: #f8f8f8; margin: 0 0 16px;">
+          Hey ${performerName} — you're locked in. We'll send you reminders as the date gets closer.
+        </p>
+
+        <p style="font-size: 15px; color: #aaa; margin: 0 0 24px;">
+          Don't forget — drop it in your calendar so it doesn't sneak up on you.
+        </p>
+
+        <div style="margin: 0 0 24px;">
+          <a href="${calendarUrl}" style="display: inline-block; padding: 12px 24px; background: #e879a0; color: #fff; text-decoration: none; border-radius: 8px; font-weight: 700; font-size: 15px; margin-right: 8px;">
+            Add to Calendar →
+          </a>
+          <a href="${micUrl}" style="display: inline-block; padding: 12px 24px; background: transparent; color: #e879a0; text-decoration: none; border-radius: 8px; font-weight: 700; font-size: 15px; border: 1px solid #e879a0;">
+            View Lineup
+          </a>
+        </div>
+
+        <p style="margin: 24px 0 0; font-size: 13px; color: #666;">
+          Can't make it? <a href="${micUrl}" style="color: #e879a0;">Visit the page</a> to remove yourself from the list.
+        </p>
+      </div>
+    `,
+  })
+}
+
+export async function sendNewSignupNotificationEmail({
+  to,
+  micName,
+  micSlug,
+  venue,
+  date,
+  startTime,
+  performerName,
+  performerInstagram,
+  performerEmail,
+  slotNumber,
+  slotsTaken,
+  totalSlots,
+}: {
+  to: string
+  micName: string
+  micSlug: string
+  venue: string
+  date: string
+  startTime: string
+  performerName: string
+  performerInstagram: string | null
+  performerEmail: string | null
+  slotNumber: number
+  slotsTaken: number
+  totalSlots: number
+}) {
+  const micUrl = micLink(micSlug)
+  const dateFormatted = formatDate(date)
+  const timeFormatted = formatTime(startTime)
+  const instagramRow = performerInstagram
+    ? `<p style="margin: 0; font-size: 14px; color: #aaa;">📸 @${performerInstagram.replace(/^@/, "")}</p>`
+    : ""
+  const emailRow = performerEmail
+    ? `<p style="margin: 0; font-size: 14px; color: #aaa;">✉️ ${performerEmail}</p>`
+    : ""
+
+  await resend.emails.send({
+    from: process.env.RESEND_FROM_EMAIL ?? "Mic Drop <noreply@yourdomain.com>",
+    to,
+    subject: `New signup — ${performerName} grabbed slot #${slotNumber} at ${micName}`,
+    html: `
+      <div style="font-family: sans-serif; max-width: 480px; margin: 0 auto; padding: 32px 24px; background: #1a1a2e; color: #f8f8f8; border-radius: 12px;">
+        <h1 style="font-size: 28px; font-weight: 800; margin: 0 0 8px;">
+          Mic<span style="color: #e879a0;">Drop</span>
+        </h1>
+        <p style="color: #aaa; margin: 0 0 32px;">Someone just signed up.</p>
+
+        <h2 style="font-size: 20px; font-weight: 700; margin: 0 0 16px;">${micName}</h2>
+
+        <div style="display: flex; flex-direction: column; gap: 8px; margin: 0 0 24px;">
+          <p style="margin: 0; font-size: 15px;">📍 ${venue}</p>
+          <p style="margin: 0; font-size: 15px;">📅 ${dateFormatted}</p>
+          <p style="margin: 0; font-size: 15px;">🕐 ${timeFormatted}</p>
+        </div>
+
+        <div style="margin: 0 0 24px; padding: 20px; background: #111124; border-radius: 8px; border: 1px solid #333;">
+          <p style="margin: 0 0 4px; font-size: 12px; text-transform: uppercase; letter-spacing: 0.1em; color: #aaa;">Slot #${slotNumber}</p>
+          <p style="margin: 0 0 8px; font-size: 22px; font-weight: 800; color: #e879a0;">${performerName}</p>
+          ${instagramRow}
+          ${emailRow}
+        </div>
+
+        <p style="font-size: 15px; color: #aaa; margin: 0 0 24px;">
+          The lineup is now ${slotsTaken}/${totalSlots} full.
+        </p>
+
+        <a href="${micUrl}" style="display: inline-block; padding: 12px 24px; background: #e879a0; color: #fff; text-decoration: none; border-radius: 8px; font-weight: 700; font-size: 15px;">
+          View Lineup →
+        </a>
       </div>
     `,
   })

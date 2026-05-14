@@ -171,7 +171,7 @@ export function CreateMicForm() {
     const result = await createMic({
       ...formData,
       slug: slug || undefined,
-      hostEmail: formData.hostEmail || undefined,
+      hostEmail: formData.hostEmail,
       imageUrl: imageUrl || undefined,
       seriesSlug,
       seriesName,
@@ -197,7 +197,7 @@ export function CreateMicForm() {
           ...formData,
           date,
           slug: undefined, // auto-generate for each
-          hostEmail: formData.hostEmail || undefined,
+          hostEmail: formData.hostEmail,
           imageUrl: imageUrl || undefined,
           seriesSlug,
           seriesName,
@@ -446,18 +446,19 @@ export function CreateMicForm() {
 
       <div className="space-y-2">
         <Label htmlFor="hostEmail" className="text-lg font-bold">
-          Your Email
+          Your Email <span className="text-red-500">*</span>
         </Label>
         <Input
           id="hostEmail"
           type="email"
+          required
           placeholder="you@example.com"
           value={formData.hostEmail}
           onChange={(e) => setFormData({ ...formData, hostEmail: e.target.value })}
           className="h-12 text-lg border-border bg-secondary/50 focus:border-neon-pink placeholder:text-muted-foreground/50"
         />
         <p className="text-sm text-muted-foreground">
-          We{"'"}ll email you your host PIN so you don{"'"}t lose it. Optional but recommended.
+          We{"'"}ll email you your host PIN so you don{"'"}t lose it.
         </p>
       </div>
 

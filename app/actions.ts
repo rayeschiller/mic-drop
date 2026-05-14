@@ -2,7 +2,13 @@
 
 import { createAdminClient } from "@/lib/supabase/admin"
 import { createClient } from "@/lib/supabase/server"
-import { sendHostPinEmail, sendWaitlistConfirmationEmail, sendWaitlistPromotionEmail } from "@/lib/email"
+import {
+  sendHostPinEmail,
+  sendNewSignupNotificationEmail,
+  sendSignupConfirmationEmail,
+  sendWaitlistConfirmationEmail,
+  sendWaitlistPromotionEmail,
+} from "@/lib/email"
 import crypto from "crypto"
 
 // --- Helpers ---
@@ -120,7 +126,7 @@ export async function createMic(formData: {
   sections: SectionInput[]
   notes: string
   slug?: string
-  hostEmail?: string
+  hostEmail: string
   imageUrl?: string
   seriesSlug?: string
   seriesName?: string
@@ -344,7 +350,7 @@ export async function signupForSlot(
 
   const { data: mic } = await admin
     .from("mics")
-    .select("id")
+    .select("id, name, slug, venue, date, start_time, end_time, timezone, host_email")
     .eq("slug", micSlug)
     .single()
 
@@ -370,6 +376,46 @@ export async function signupForSlot(
 
   if (!updated || updated.length === 0) {
     return { success: false, error: "Slot already taken" }
+  }
+
+  if (email) {
+    sendSignupConfirmationEmail({
+      to: email,
+      performerName: name,
+      micName: mic.name,
+      micSlug: mic.slug,
+      venue: mic.venue,
+      date: mic.date,
+      startTime: mic.start_time,
+      endTime: mic.end_time,
+      timezone: mic.timezone,
+      slotNumber,
+    }).catch((err) => console.error("Failed to send signup confirmation email:", err))
+  }
+
+  if (mic.host_email) {
+    const { data: slotCounts } = await admin
+      .from("slots")
+      .select("taken")
+      .eq("mic_id", mic.id)
+
+    const totalSlots = slotCounts?.length ?? 0
+    const slotsTaken = slotCounts?.filter((s) => s.taken).length ?? 0
+
+    sendNewSignupNotificationEmail({
+      to: mic.host_email,
+      micName: mic.name,
+      micSlug: mic.slug,
+      venue: mic.venue,
+      date: mic.date,
+      startTime: mic.start_time,
+      performerName: name,
+      performerInstagram: instagram || null,
+      performerEmail: email || null,
+      slotNumber,
+      slotsTaken,
+      totalSlots,
+    }).catch((err) => console.error("Failed to send new signup email:", err))
   }
 
   return { success: true }
