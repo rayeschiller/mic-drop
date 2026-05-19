@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Sparkles, Check, X, Loader2, Plus, Trash2, RepeatIcon } from "lucide-react"
-import { createMic, checkSlugAvailability } from "@/app/actions"
+import { createMic, checkSlugAvailability, geocodeAddress } from "@/app/actions"
 import { ImageUpload } from "@/components/image-upload"
 import { SignupReleasePicker } from "@/components/signup-release-picker"
 
@@ -64,6 +64,7 @@ export function CreateMicForm() {
   const [formData, setFormData] = useState({
     name: "",
     venue: "",
+    address: "",
     date: "",
     notes: "",
     hostEmail: "",
@@ -168,6 +169,13 @@ export function CreateMicForm() {
       (typeof Intl !== "undefined" && Intl.DateTimeFormat().resolvedOptions().timeZone) ||
       "America/Los_Angeles"
 
+    // Geocode once so recurring instances share the same coordinates
+    let locationData: { latitude?: number | null; longitude?: number | null; city?: string | null; state?: string | null } = {}
+    if (formData.address.trim()) {
+      const geocoded = await geocodeAddress(formData.address.trim())
+      locationData = geocoded
+    }
+
     const result = await createMic({
       ...formData,
       slug: slug || undefined,
@@ -180,6 +188,8 @@ export function CreateMicForm() {
       signupOpensAt: signupOpensAt || undefined,
       sendReminders,
       timezone,
+      address: formData.address.trim() || undefined,
+      ...locationData,
     })
 
     if (!result.success || !result.slug || !result.hostPin) {
@@ -206,6 +216,8 @@ export function CreateMicForm() {
           signupOpensAt: signupOpensAt || undefined,
           sendReminders,
           timezone,
+          address: formData.address.trim() || undefined,
+          ...locationData,
         })
         if (extra.success) count++
       }
@@ -332,6 +344,22 @@ export function CreateMicForm() {
           required
           className="h-12 text-lg border-border bg-secondary/50 focus:border-neon-pink placeholder:text-muted-foreground/50"
         />
+      </div>
+
+      <div className="space-y-2">
+        <Label htmlFor="address" className="text-lg font-bold">
+          Venue Address
+        </Label>
+        <Input
+          id="address"
+          placeholder='e.g. "123 Main St, Los Angeles, CA"'
+          value={formData.address}
+          onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+          className="h-12 text-lg border-border bg-secondary/50 focus:border-neon-pink placeholder:text-muted-foreground/50"
+        />
+        <p className="text-sm text-muted-foreground">
+          Optional — used to show your mic on the map so comedians can find mics near them.
+        </p>
       </div>
 
       <div className="space-y-2">

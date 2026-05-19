@@ -55,7 +55,7 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body className={`font-sans antialiased min-h-screen flex flex-col`}>
-        <ThemeProvider attribute="class" defaultTheme="dark" enableSystem={false}>
+        <ThemeProvider attribute="class" defaultTheme="light" enableSystem={false}>
           <div className="flex-1">{children}</div>
           <footer className="border-t border-border py-6 px-6 text-sm text-muted-foreground">
             <div className="mx-auto max-w-5xl flex flex-col sm:flex-row items-center justify-between gap-3">

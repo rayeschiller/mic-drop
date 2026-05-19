@@ -74,6 +74,11 @@ export interface MicData {
   sendTwoDayReminder: boolean
   waitlistCount: number
   waitlist?: WaitlistEntry[]  // only populated in host mode
+  address: string | null
+  city: string | null
+  state: string | null
+  latitude: number | null
+  longitude: number | null
 }
 
 export interface WaitlistEntry {
@@ -113,6 +118,34 @@ export async function uploadMicImage(formData: FormData): Promise<{ url?: string
   return { url: data.publicUrl }
 }
 
+export async function geocodeAddress(address: string): Promise<{
+  latitude: number | null
+  longitude: number | null
+  city: string | null
+  state: string | null
+}> {
+  try {
+    const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(address)}&format=json&limit=1&addressdetails=1`
+    const res = await fetch(url, {
+      headers: { "User-Agent": "MicDrop/1.0 (mics.rayeschiller.com)" },
+      next: { revalidate: 0 },
+    })
+    if (!res.ok) return { latitude: null, longitude: null, city: null, state: null }
+    const data = await res.json()
+    if (!data?.[0]) return { latitude: null, longitude: null, city: null, state: null }
+    const result = data[0]
+    const addr = result.address || {}
+    return {
+      latitude: parseFloat(result.lat),
+      longitude: parseFloat(result.lon),
+      city: addr.city || addr.town || addr.village || null,
+      state: addr.state || null,
+    }
+  } catch {
+    return { latitude: null, longitude: null, city: null, state: null }
+  }
+}
+
 export async function checkSlugAvailability(slug: string): Promise<{ available: boolean }> {
   const admin = createAdminClient()
   const { data } = await admin.from("mics").select("id").eq("slug", slug).maybeSingle()
@@ -134,6 +167,11 @@ export async function createMic(formData: {
   signupOpensAt?: string | null
   sendReminders?: boolean
   timezone?: string  // IANA zone (e.g. "America/New_York"); used by reminder crons
+  address?: string
+  latitude?: number | null
+  longitude?: number | null
+  city?: string | null
+  state?: string | null
 }): Promise<{ success: boolean; slug?: string; hostPin?: string; error?: string }> {
   const admin = createAdminClient()
   const slug = formData.slug?.trim() || generateSlug(formData.name)
@@ -163,6 +201,11 @@ export async function createMic(formData: {
       signup_opens_at: formData.signupOpensAt || null,
       send_reminders: formData.sendReminders ?? false,
       timezone: formData.timezone || null,
+      address: formData.address || null,
+      city: formData.city || null,
+      state: formData.state || null,
+      latitude: formData.latitude ?? null,
+      longitude: formData.longitude ?? null,
     })
     .select("id")
     .single()
@@ -296,6 +339,11 @@ function buildMicData(
     sendTwoDayReminder: (mic.send_two_day_reminder as boolean) ?? false,
     waitlistCount,
     waitlist,
+    address: mic.address as string | null,
+    city: mic.city as string | null,
+    state: mic.state as string | null,
+    latitude: mic.latitude as number | null,
+    longitude: mic.longitude as number | null,
   }
 }
 
@@ -337,6 +385,63 @@ export async function getMic(slug: string): Promise<{ mic: MicData | null; error
   return {
     mic: buildMicData(mic, slots, sections, false, waitlistCount ?? 0),
   }
+}
+
+export interface MicLocationData {
+  id: string
+  slug: string
+  name: string
+  venue: string
+  city: string | null
+  state: string | null
+  date: string
+  startTime: string
+  latitude: number
+  longitude: number
+  takenSlots: number
+  totalSlots: number
+}
+
+export async function getUpcomingMicsWithLocation(): Promise<MicLocationData[]> {
+  const supabase = await createClient()
+  const today = new Date().toISOString().split("T")[0]
+
+  const { data: mics } = await supabase
+    .from("mics")
+    .select("id, slug, name, venue, city, state, date, start_time, latitude, longitude, total_slots")
+    .gte("date", today)
+    .not("latitude", "is", null)
+    .not("longitude", "is", null)
+    .order("date", { ascending: true })
+    .limit(200)
+
+  if (!mics?.length) return []
+
+  const micIds = mics.map((m) => m.id)
+  const { data: slots } = await supabase
+    .from("slots")
+    .select("mic_id, taken")
+    .in("mic_id", micIds)
+
+  const takenByMic: Record<string, number> = {}
+  for (const slot of slots || []) {
+    if (slot.taken) takenByMic[slot.mic_id] = (takenByMic[slot.mic_id] || 0) + 1
+  }
+
+  return mics.map((m) => ({
+    id: m.id,
+    slug: m.slug,
+    name: m.name,
+    venue: m.venue,
+    city: m.city,
+    state: m.state,
+    date: m.date,
+    startTime: m.start_time,
+    latitude: m.latitude,
+    longitude: m.longitude,
+    takenSlots: takenByMic[m.id] || 0,
+    totalSlots: m.total_slots,
+  }))
 }
 
 export async function signupForSlot(
