@@ -1,44 +1,8 @@
 'use client'
 
-import { useEffect } from 'react'
-import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet'
-import L from 'leaflet'
-import 'leaflet/dist/leaflet.css'
+import { useState } from 'react'
+import { Map, AdvancedMarker, InfoWindow } from '@vis.gl/react-google-maps'
 import type { MicLocationData } from '@/app/actions'
-
-// Fix Leaflet's broken default icon paths in webpack/Next.js
-const defaultIcon = L.icon({
-  iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
-  iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
-  shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
-  iconSize: [25, 41],
-  iconAnchor: [12, 41],
-  popupAnchor: [1, -34],
-  shadowSize: [41, 41],
-})
-
-const userIcon = L.divIcon({
-  className: '',
-  html: '<div style="width:14px;height:14px;background:#ec4899;border:3px solid white;border-radius:50%;box-shadow:0 0 0 2px #ec4899;"></div>',
-  iconSize: [14, 14],
-  iconAnchor: [7, 7],
-})
-
-function FitBounds({ mics, userLocation }: { mics: MicLocationData[]; userLocation: [number, number] | null }) {
-  const map = useMap()
-  useEffect(() => {
-    const points: [number, number][] = mics.map((m) => [m.latitude, m.longitude])
-    if (userLocation) points.push(userLocation)
-    if (points.length === 0) return
-    if (points.length === 1) {
-      map.setView(points[0], 13)
-      return
-    }
-    const bounds = L.latLngBounds(points)
-    map.fitBounds(bounds, { padding: [40, 40] })
-  }, [map, mics, userLocation])
-  return null
-}
 
 function formatDate(dateStr: string) {
   const [y, m, d] = dateStr.split('-').map(Number)
@@ -53,54 +17,74 @@ function formatTime(timeStr: string) {
 }
 
 interface MicMapProps {
-  mics: MicLocationData[]
+  mics: (MicLocationData & { distanceMi?: number })[]
   userLocation: [number, number] | null
-  center: [number, number]
+  center: { lat: number; lng: number }
   zoom: number
 }
 
 export default function MicMap({ mics, userLocation, center, zoom }: MicMapProps) {
-  return (
-    <MapContainer
-      center={center}
-      zoom={zoom}
-      style={{ height: '100%', width: '100%' }}
-      scrollWheelZoom={false}
-    >
-      <TileLayer
-        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-        url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-      />
-      <FitBounds mics={mics} userLocation={userLocation} />
+  const [openMicId, setOpenMicId] = useState<string | null>(null)
 
+  return (
+    <Map
+      defaultCenter={center}
+      defaultZoom={zoom}
+      mapId="mic-drop-map"
+      gestureHandling="cooperative"
+      disableDefaultUI={false}
+      style={{ width: '100%', height: '100%' }}
+    >
+      {/* User location dot */}
       {userLocation && (
-        <Marker position={userLocation} icon={userIcon}>
-          <Popup>You are here</Popup>
-        </Marker>
+        <AdvancedMarker position={{ lat: userLocation[0], lng: userLocation[1] }}>
+          <div className="w-4 h-4 rounded-full bg-neon-pink border-2 border-white shadow-lg shadow-neon-pink/50" />
+        </AdvancedMarker>
       )}
 
-      {mics.map((mic) => (
-        <Marker key={mic.id} position={[mic.latitude, mic.longitude]} icon={defaultIcon}>
-          <Popup>
-            <div style={{ minWidth: '160px' }}>
-              <strong style={{ display: 'block', marginBottom: '4px' }}>{mic.name}</strong>
-              <span style={{ color: '#6b7280', fontSize: '13px', display: 'block' }}>{mic.venue}</span>
-              <span style={{ color: '#6b7280', fontSize: '13px', display: 'block' }}>
-                {formatDate(mic.date)} · {formatTime(mic.startTime)}
-              </span>
-              <span style={{ color: '#6b7280', fontSize: '13px', display: 'block', marginBottom: '8px' }}>
-                {mic.totalSlots - mic.takenSlots} slots open
-              </span>
-              <a
-                href={`/${mic.slug}`}
-                style={{ color: '#ec4899', fontWeight: 600, fontSize: '13px', textDecoration: 'none' }}
+      {mics.map((mic) => {
+        const open = mic.totalSlots - mic.takenSlots
+        return (
+          <div key={mic.id}>
+            <AdvancedMarker
+              position={{ lat: mic.latitude, lng: mic.longitude }}
+              onClick={() => setOpenMicId(mic.id === openMicId ? null : mic.id)}
+            >
+              <div className="flex flex-col items-center cursor-pointer group">
+                <div className="bg-background border-2 border-neon-pink rounded-lg px-2 py-1 shadow-md text-xs font-bold text-foreground group-hover:bg-neon-pink group-hover:text-white transition-colors whitespace-nowrap">
+                  {open === 0 ? 'Full' : `${open} open`}
+                </div>
+                <div className="w-0 h-0 border-l-4 border-r-4 border-t-4 border-l-transparent border-r-transparent border-t-neon-pink -mt-px" />
+              </div>
+            </AdvancedMarker>
+
+            {openMicId === mic.id && (
+              <InfoWindow
+                position={{ lat: mic.latitude, lng: mic.longitude }}
+                onCloseClick={() => setOpenMicId(null)}
+                pixelOffset={[0, -44]}
               >
-                View & Sign Up →
-              </a>
-            </div>
-          </Popup>
-        </Marker>
-      ))}
-    </MapContainer>
+                <div className="min-w-[180px] p-1">
+                  <p className="font-bold text-sm mb-1">{mic.name}</p>
+                  <p className="text-xs text-gray-500 mb-0.5">{mic.venue}</p>
+                  {mic.formattedAddress && (
+                    <p className="text-xs text-gray-400 mb-0.5">{mic.formattedAddress}</p>
+                  )}
+                  <p className="text-xs text-gray-500 mb-2">
+                    {formatDate(mic.date)} · {formatTime(mic.startTime)}
+                  </p>
+                  <a
+                    href={`/${mic.slug}`}
+                    className="text-xs font-semibold text-pink-500 hover:underline"
+                  >
+                    View &amp; Sign Up →
+                  </a>
+                </div>
+              </InfoWindow>
+            )}
+          </div>
+        )
+      })}
+    </Map>
   )
 }

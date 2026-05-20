@@ -74,9 +74,8 @@ export interface MicData {
   sendTwoDayReminder: boolean
   waitlistCount: number
   waitlist?: WaitlistEntry[]  // only populated in host mode
-  address: string | null
-  city: string | null
-  state: string | null
+  placeId: string | null
+  formattedAddress: string | null
   latitude: number | null
   longitude: number | null
 }
@@ -118,34 +117,6 @@ export async function uploadMicImage(formData: FormData): Promise<{ url?: string
   return { url: data.publicUrl }
 }
 
-export async function geocodeAddress(address: string): Promise<{
-  latitude: number | null
-  longitude: number | null
-  city: string | null
-  state: string | null
-}> {
-  try {
-    const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(address)}&format=json&limit=1&addressdetails=1`
-    const res = await fetch(url, {
-      headers: { "User-Agent": "MicDrop/1.0 (mics.rayeschiller.com)" },
-      next: { revalidate: 0 },
-    })
-    if (!res.ok) return { latitude: null, longitude: null, city: null, state: null }
-    const data = await res.json()
-    if (!data?.[0]) return { latitude: null, longitude: null, city: null, state: null }
-    const result = data[0]
-    const addr = result.address || {}
-    return {
-      latitude: parseFloat(result.lat),
-      longitude: parseFloat(result.lon),
-      city: addr.city || addr.town || addr.village || null,
-      state: addr.state || null,
-    }
-  } catch {
-    return { latitude: null, longitude: null, city: null, state: null }
-  }
-}
-
 export async function checkSlugAvailability(slug: string): Promise<{ available: boolean }> {
   const admin = createAdminClient()
   const { data } = await admin.from("mics").select("id").eq("slug", slug).maybeSingle()
@@ -167,11 +138,10 @@ export async function createMic(formData: {
   signupOpensAt?: string | null
   sendReminders?: boolean
   timezone?: string  // IANA zone (e.g. "America/New_York"); used by reminder crons
-  address?: string
+  placeId?: string | null
+  formattedAddress?: string | null
   latitude?: number | null
   longitude?: number | null
-  city?: string | null
-  state?: string | null
 }): Promise<{ success: boolean; slug?: string; hostPin?: string; error?: string }> {
   const admin = createAdminClient()
   const slug = formData.slug?.trim() || generateSlug(formData.name)
@@ -201,9 +171,8 @@ export async function createMic(formData: {
       signup_opens_at: formData.signupOpensAt || null,
       send_reminders: formData.sendReminders ?? false,
       timezone: formData.timezone || null,
-      address: formData.address || null,
-      city: formData.city || null,
-      state: formData.state || null,
+      place_id: formData.placeId || null,
+      formatted_address: formData.formattedAddress || null,
       latitude: formData.latitude ?? null,
       longitude: formData.longitude ?? null,
     })
@@ -339,9 +308,8 @@ function buildMicData(
     sendTwoDayReminder: (mic.send_two_day_reminder as boolean) ?? false,
     waitlistCount,
     waitlist,
-    address: mic.address as string | null,
-    city: mic.city as string | null,
-    state: mic.state as string | null,
+    placeId: mic.place_id as string | null,
+    formattedAddress: mic.formatted_address as string | null,
     latitude: mic.latitude as number | null,
     longitude: mic.longitude as number | null,
   }
@@ -392,8 +360,8 @@ export interface MicLocationData {
   slug: string
   name: string
   venue: string
-  city: string | null
-  state: string | null
+  formattedAddress: string | null
+  placeId: string | null
   date: string
   startTime: string
   latitude: number
@@ -408,7 +376,7 @@ export async function getUpcomingMicsWithLocation(): Promise<MicLocationData[]> 
 
   const { data: mics } = await supabase
     .from("mics")
-    .select("id, slug, name, venue, city, state, date, start_time, latitude, longitude, total_slots")
+    .select("id, slug, name, venue, formatted_address, place_id, date, start_time, latitude, longitude, total_slots")
     .gte("date", today)
     .not("latitude", "is", null)
     .not("longitude", "is", null)
@@ -433,8 +401,8 @@ export async function getUpcomingMicsWithLocation(): Promise<MicLocationData[]> 
     slug: m.slug,
     name: m.name,
     venue: m.venue,
-    city: m.city,
-    state: m.state,
+    formattedAddress: m.formatted_address,
+    placeId: m.place_id,
     date: m.date,
     startTime: m.start_time,
     latitude: m.latitude,

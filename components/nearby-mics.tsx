@@ -44,14 +44,15 @@ function formatTime(timeStr: string) {
 
 type GeoState = 'idle' | 'loading' | 'granted' | 'denied' | 'unsupported'
 
+type MicWithDistance = MicLocationData & { distanceMi: number }
+
 export function NearbyMics() {
   const [geoState, setGeoState] = useState<GeoState>('idle')
   const [userLocation, setUserLocation] = useState<[number, number] | null>(null)
   const [allMics, setAllMics] = useState<MicLocationData[]>([])
-  const [sortedMics, setSortedMics] = useState<(MicLocationData & { distanceMi: number })[]>([])
+  const [sortedMics, setSortedMics] = useState<MicWithDistance[]>([])
   const [micsLoaded, setMicsLoaded] = useState(false)
 
-  // Fetch all mics with location once
   useEffect(() => {
     getUpcomingMicsWithLocation().then((mics) => {
       setAllMics(mics)
@@ -59,38 +60,32 @@ export function NearbyMics() {
     })
   }, [])
 
-  // Sort by distance once we have user location and mics
   useEffect(() => {
     if (!userLocation || !allMics.length) return
     const [lat, lng] = userLocation
     const sorted = allMics
-      .map((m) => ({
-        ...m,
-        distanceMi: toMiles(haversineKm(lat, lng, m.latitude, m.longitude)),
-      }))
+      .map((m) => ({ ...m, distanceMi: toMiles(haversineKm(lat, lng, m.latitude, m.longitude)) }))
       .sort((a, b) => a.distanceMi - b.distanceMi)
     setSortedMics(sorted)
   }, [userLocation, allMics])
 
   const requestLocation = () => {
-    if (!navigator.geolocation) {
-      setGeoState('unsupported')
-      return
-    }
+    if (!navigator.geolocation) { setGeoState('unsupported'); return }
     setGeoState('loading')
     navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        setUserLocation([pos.coords.latitude, pos.coords.longitude])
-        setGeoState('granted')
-      },
+      (pos) => { setUserLocation([pos.coords.latitude, pos.coords.longitude]); setGeoState('granted') },
       () => setGeoState('denied'),
       { timeout: 10000 }
     )
   }
 
-  const mapCenter: [number, number] = userLocation ?? [39.5, -98.35]
+  const mapCenter = userLocation
+    ? { lat: userLocation[0], lng: userLocation[1] }
+    : { lat: 39.5, lng: -98.35 }
   const mapZoom = userLocation ? 10 : 4
-  const displayMics = userLocation ? sortedMics : allMics.map((m) => ({ ...m, distanceMi: 0 }))
+  const displayMics: MicWithDistance[] = userLocation
+    ? sortedMics
+    : allMics.map((m) => ({ ...m, distanceMi: 0 }))
 
   if (!micsLoaded) {
     return (
@@ -112,9 +107,7 @@ export function NearbyMics() {
             <h2 className="text-3xl font-bold md:text-4xl">
               Mics near <span className="text-neon-green">you</span>
             </h2>
-            <p className="mt-2 text-muted-foreground">
-              Upcoming open mics with open slots.
-            </p>
+            <p className="mt-2 text-muted-foreground">Upcoming open mics with open slots.</p>
           </div>
           {geoState !== 'granted' && (
             <Button
@@ -123,11 +116,9 @@ export function NearbyMics() {
               variant="outline"
               className="shrink-0 border-neon-green text-neon-green hover:bg-neon-green/10 font-semibold"
             >
-              {geoState === 'loading' ? (
-                <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Locating…</>
-              ) : (
-                <><Navigation className="mr-2 h-4 w-4" />Find near me</>
-              )}
+              {geoState === 'loading'
+                ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Locating…</>
+                : <><Navigation className="mr-2 h-4 w-4" />Find near me</>}
             </Button>
           )}
         </div>
@@ -138,12 +129,10 @@ export function NearbyMics() {
           </p>
         )}
 
-        {/* Map */}
         <div className="w-full h-72 md:h-96 rounded-xl overflow-hidden border border-border mb-8">
           <MicMap mics={displayMics} userLocation={userLocation} center={mapCenter} zoom={mapZoom} />
         </div>
 
-        {/* List */}
         <div className="space-y-3">
           {displayMics.slice(0, 20).map((mic) => {
             const open = mic.totalSlots - mic.takenSlots
@@ -160,7 +149,7 @@ export function NearbyMics() {
                   <div className="flex items-center gap-1 mt-0.5 text-sm text-muted-foreground">
                     <MapPin className="h-3 w-3 shrink-0" />
                     <span className="truncate">
-                      {mic.venue}{mic.city ? ` · ${mic.city}${mic.state ? `, ${mic.state}` : ''}` : ''}
+                      {mic.formattedAddress ?? mic.venue}
                     </span>
                   </div>
                   <p className="text-sm text-muted-foreground mt-0.5">
@@ -171,15 +160,13 @@ export function NearbyMics() {
                   {userLocation && (
                     <p className="text-xs text-muted-foreground mb-1">{mic.distanceMi.toFixed(1)} mi</p>
                   )}
-                  <span
-                    className={`inline-block rounded-full px-2.5 py-0.5 text-xs font-semibold ${
-                      open === 0
-                        ? 'bg-destructive/10 text-destructive'
-                        : open <= 3
-                        ? 'bg-neon-amber/10 text-neon-amber'
-                        : 'bg-neon-green/10 text-neon-green'
-                    }`}
-                  >
+                  <span className={`inline-block rounded-full px-2.5 py-0.5 text-xs font-semibold ${
+                    open === 0
+                      ? 'bg-destructive/10 text-destructive'
+                      : open <= 3
+                      ? 'bg-neon-amber/10 text-neon-amber'
+                      : 'bg-neon-green/10 text-neon-green'
+                  }`}>
                     {open === 0 ? 'Full' : `${open} open`}
                   </span>
                 </div>
