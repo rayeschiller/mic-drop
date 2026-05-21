@@ -1069,12 +1069,12 @@ export async function hostRemoveWaitlistEntry(
 export async function getMicsBySeries(
   seriesSlug: string,
   currentMicId: string
-): Promise<{ id: string; slug: string; name: string; date: string; startTime: string; signupOpensAt: string | null }[]> {
+): Promise<{ id: string; slug: string; name: string; date: string; startTime: string; signupOpensAt: string | null; imageUrl: string | null }[]> {
   const admin = createAdminClient()
 
   const { data } = await admin
     .from("mics")
-    .select("id, slug, name, date, start_time, signup_opens_at")
+    .select("id, slug, name, date, start_time, signup_opens_at, image_url")
     .eq("series_slug", seriesSlug)
     .neq("id", currentMicId)
     .order("date", { ascending: true })
@@ -1086,5 +1086,6 @@ export async function getMicsBySeries(
     date: m.date,
     startTime: m.start_time,
     signupOpensAt: m.signup_opens_at,
+    imageUrl: m.image_url ?? null,
   }))
 }

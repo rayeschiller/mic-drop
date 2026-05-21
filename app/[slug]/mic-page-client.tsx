@@ -231,7 +231,7 @@ function SlotRow({
   )
 }
 
-type OtherDate = { id: string; slug: string; name: string; date: string; startTime: string; signupOpensAt: string | null }
+type OtherDate = { id: string; slug: string; name: string; date: string; startTime: string; signupOpensAt: string | null; imageUrl: string | null }
 
 export function MicPageClient({
   slug,
@@ -264,6 +264,9 @@ export function MicPageClient({
 
   // Series / other dates — pre-sorted chronologically including current
   const [otherDates, setOtherDates] = useState<OtherDate[]>(initialOtherDates)
+
+  // Use the first image found across this mic or any date in the series
+  const displayImageUrl = mic?.imageUrl ?? otherDates.find((d) => d.imageUrl)?.imageUrl ?? null
 
   // Signup release countdown
   const [isLocked, setIsLocked] = useState(false)
@@ -626,13 +629,13 @@ export function MicPageClient({
         </div>
       )}
 
-      <div className={`mx-auto px-6 py-12 ${mic.imageUrl ? "max-w-5xl" : "max-w-3xl"}`}>
-        <div className={mic.imageUrl ? "flex flex-col md:grid md:grid-cols-[1fr_300px] gap-8 items-start" : ""}>
+      <div className={`mx-auto px-6 py-12 ${displayImageUrl ? "max-w-5xl" : "max-w-3xl"}`}>
+        <div className={displayImageUrl ? "flex flex-col md:grid md:grid-cols-[1fr_300px] gap-8 items-start" : ""}>
 
           {/* Mobile image — above content */}
-          {mic.imageUrl && (
+          {displayImageUrl && (
             <img
-              src={mic.imageUrl}
+              src={displayImageUrl}
               alt={mic.name}
               className="md:hidden w-full rounded-2xl object-cover"
             />
@@ -869,10 +872,10 @@ export function MicPageClient({
           </div>{/* end main content column */}
 
           {/* Desktop sticky image */}
-          {mic.imageUrl && (
+          {displayImageUrl && (
             <div className="hidden md:block sticky top-6">
               <img
-                src={mic.imageUrl}
+                src={displayImageUrl}
                 alt={mic.name}
                 className="w-full rounded-2xl object-cover shadow-2xl"
               />
