@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect, useCallback, useRef } from "react"
 import Markdown from "react-markdown"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
@@ -18,8 +18,9 @@ import {
   Trash2,
   ShieldCheck,
   CalendarPlus,
-  ChevronRight,
   Timer,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { SignupModal } from "@/components/signup-modal"
@@ -37,6 +38,7 @@ import {
   verifyHostPin,
   hostRemoveSlot,
   hostUpdateMic,
+  createMic,
   joinWaitlist,
   leaveWaitlist,
   hostRemoveWaitlistEntry,
@@ -46,6 +48,7 @@ import {
   type SectionInput,
   type WaitlistEntry,
 } from "@/app/actions"
+import { calcRecurringDates, type RecurringFrequency } from "@/lib/recurring"
 
 function formatDate(dateString: string): string {
   const date = new Date(dateString + "T00:00:00")
@@ -57,13 +60,13 @@ function formatDate(dateString: string): string {
   })
 }
 
-function formatDateShort(dateString: string): string {
-  const date = new Date(dateString + "T00:00:00")
-  return date.toLocaleDateString("en-US", {
-    weekday: "short",
-    month: "short",
-    day: "numeric",
-  })
+function formatDayAbbr(dateString: string): string {
+  return new Date(dateString + "T00:00:00").toLocaleDateString("en-US", { weekday: "short" }).toUpperCase()
+}
+
+function formatMonthDay(dateString: string): string {
+  const d = new Date(dateString + "T00:00:00")
+  return `${d.getMonth() + 1}/${d.getDate()}`
 }
 
 function toICSDate(date: string, time: string): string {
@@ -228,15 +231,25 @@ function SlotRow({
   )
 }
 
-export function MicPageClient({ slug }: { slug: string }) {
+type OtherDate = { id: string; slug: string; name: string; date: string; startTime: string; signupOpensAt: string | null }
+
+export function MicPageClient({
+  slug,
+  initialMic,
+  initialOtherDates,
+}: {
+  slug: string
+  initialMic: MicData | null
+  initialOtherDates: OtherDate[]
+}) {
   const router = useRouter()
-  const [mic, setMic] = useState<MicData | null>(null)
+  const [mic, setMic] = useState<MicData | null>(initialMic)
   const [selectedSlot, setSelectedSlot] = useState<{ number: number; displayNumber: number } | null>(null)
   const [modalOpen, setModalOpen] = useState(false)
   const [removeModalOpen, setRemoveModalOpen] = useState(false)
   const [slotToRemove, setSlotToRemove] = useState<{ slot: SlotData; displayNumber: number } | null>(null)
   const [copied, setCopied] = useState(false)
-  const [isLoading, setIsLoading] = useState(true)
+  const [isLoading, setIsLoading] = useState(initialMic === null)
 
   // Host mode state
   const [isHost, setIsHost] = useState(false)
@@ -249,8 +262,8 @@ export function MicPageClient({ slug }: { slug: string }) {
   const [waitlistModalOpen, setWaitlistModalOpen] = useState(false)
   const [leaveWaitlistModalOpen, setLeaveWaitlistModalOpen] = useState(false)
 
-  // Series / other dates
-  const [otherDates, setOtherDates] = useState<{ id: string; slug: string; name: string; date: string; startTime: string; signupOpensAt: string | null }[]>([])
+  // Series / other dates — pre-sorted chronologically including current
+  const [otherDates, setOtherDates] = useState<OtherDate[]>(initialOtherDates)
 
   // Signup release countdown
   const [isLocked, setIsLocked] = useState(false)
@@ -267,16 +280,23 @@ export function MicPageClient({ slug }: { slug: string }) {
   }, [slug, isHost, hostPin])
 
   useEffect(() => {
-    loadMic().then(() => setIsLoading(false))
-  }, [loadMic])
-
-  // Fetch other dates in series when mic loads
-  useEffect(() => {
-    if (mic?.seriesSlug) {
-      getMicsBySeries(mic.seriesSlug, mic.id).then(setOtherDates)
-    } else {
-      setOtherDates([])
+    if (initialMic === null) {
+      loadMic().then(() => setIsLoading(false))
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  // Re-fetch when host mode toggles
+  useEffect(() => {
+    if (isHost) loadMic()
+  }, [isHost, loadMic])
+
+  // Fetch other dates in series when mic loads (only if not pre-loaded)
+  useEffect(() => {
+    if (initialOtherDates.length === 0 && mic?.seriesSlug) {
+      getMicsBySeries(mic.seriesSlug, mic.id).then(setOtherDates)
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mic?.seriesSlug, mic?.id])
 
   // Signup release countdown
@@ -376,19 +396,62 @@ export function MicPageClient({ slug }: { slug: string }) {
     signupOpensAt?: string | null
     sendReminders?: boolean
     sendTwoDayReminder?: boolean
+    recurringFrequency?: RecurringFrequency
+    recurringEndDate?: string
+    customDays?: number[]
   }) => {
     if (!hostPin) return
-    // Re-capture the editor's IANA timezone so reminder crons stay aligned.
     const timezone =
       (typeof Intl !== "undefined" && Intl.DateTimeFormat().resolvedOptions().timeZone) ||
       undefined
-    const result = await hostUpdateMic(slug, hostPin, { ...data, timezone })
-    if (result.success) {
-      if (result.newSlug) {
-        router.push(`/${result.newSlug}`)
-      } else {
-        await loadMic()
+
+    const { recurringFrequency, recurringEndDate, customDays, ...updateData } = data
+
+    // If making recurring, assign a series slug to this mic first
+    const newSeriesSlug = recurringEndDate && !data.seriesSlug
+      ? `${data.slug}-series-${Math.random().toString(36).substring(2, 6)}`
+      : data.seriesSlug || undefined
+
+    const result = await hostUpdateMic(slug, hostPin, {
+      ...updateData,
+      seriesSlug: newSeriesSlug,
+      seriesName: data.seriesName || data.name,
+      timezone,
+    })
+
+    if (!result.success) return
+
+    // Create future recurring instances
+    if (recurringEndDate && recurringFrequency && newSeriesSlug) {
+      const extraDates = calcRecurringDates(data.date, recurringFrequency, recurringEndDate, customDays)
+      const sectionPayload = data.sections ?? [{
+        startTime: data.startTime,
+        endTime: data.endTime || undefined,
+        slots: data.totalSlots,
+      }]
+      for (const date of extraDates) {
+        await createMic({
+          name: data.name,
+          venue: data.venue,
+          date,
+          notes: data.notes || "",
+          hostEmail: "",
+          sections: sectionPayload,
+          seriesSlug: newSeriesSlug,
+          seriesName: data.seriesName || data.name,
+          hostPin: hostPin ?? undefined,
+          signupOpensAt: data.signupOpensAt || undefined,
+          sendReminders: data.sendReminders,
+          sendTwoDayReminder: data.sendTwoDayReminder,
+          timezone,
+        })
       }
+    }
+
+    if (result.newSlug) {
+      router.push(`/${result.newSlug}`)
+    } else {
+      await loadMic()
     }
   }
 
@@ -570,7 +633,7 @@ export function MicPageClient({ slug }: { slug: string }) {
           )}
 
           {/* Main content column */}
-          <div>
+          <div className="min-w-0">
             {/* Mic Header */}
             <div className="relative overflow-hidden rounded-2xl border-2 border-primary bg-card mb-8">
               <div className="relative p-8 md:p-12">
@@ -583,9 +646,23 @@ export function MicPageClient({ slug }: { slug: string }) {
                   </h1>
 
                   <div className="mt-8 flex flex-col gap-3 text-foreground">
-                    <div className="flex items-center gap-3">
-                      <MapPin className="h-5 w-5 text-foreground flex-shrink-0" />
-                      <span className="text-lg">{mic.venue}</span>
+                    <div className="flex items-start gap-3">
+                      <MapPin className="h-5 w-5 text-foreground flex-shrink-0 mt-0.5" />
+                      <div>
+                        <span className="text-lg">{mic.venue}</span>
+                        {mic.formattedAddress && (
+                          <a
+                            href={mic.placeId
+                              ? `https://www.google.com/maps/place/?q=place_id:${mic.placeId}`
+                              : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(mic.formattedAddress)}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="block text-sm text-foreground/80 dark:text-foreground/55 hover:text-foreground underline underline-offset-2 transition-colors mt-0.5"
+                          >
+                            {mic.formattedAddress}
+                          </a>
+                        )}
+                      </div>
                     </div>
 
                     <div className="flex items-center gap-3">
@@ -653,6 +730,16 @@ export function MicPageClient({ slug }: { slug: string }) {
                 </div>
               </div>
             </div>
+
+            {/* Series date pills */}
+            {otherDates.length > 0 && (
+              <DatePillScroller
+                currentId={mic.id}
+                currentSlug={mic.slug}
+                currentDate={mic.date}
+                otherDates={otherDates}
+              />
+            )}
 
             {/* Slot List */}
             <div className="space-y-4">
@@ -772,41 +859,6 @@ export function MicPageClient({ slug }: { slug: string }) {
               )}
             </div>
 
-            {/* Other dates in series */}
-            {otherDates.length > 0 && (
-              <div className="mt-10 space-y-3">
-                <h2 className="text-xl font-bold text-foreground">
-                  {mic.seriesName ? `Other ${mic.seriesName} Dates` : "Other Dates"}
-                </h2>
-                <div className="rounded-xl border border-border overflow-hidden">
-                  {otherDates.map((d, idx) => {
-                    const dateLocked = !!d.signupOpensAt && new Date(d.signupOpensAt) > new Date()
-                    return (
-                      <Link
-                        key={d.id}
-                        href={`/${d.slug}`}
-                        className={`flex items-center justify-between px-4 py-3 transition-colors ${
-                          idx < otherDates.length - 1 ? "border-b border-border" : ""
-                        } ${dateLocked ? "opacity-60" : "hover:bg-secondary/30"}`}
-                      >
-                        <div>
-                          <div className="flex items-center gap-2">
-                            <p className="font-medium text-foreground text-sm">{formatDateShort(d.date)}</p>
-                            {dateLocked && <Lock className="h-3 w-3 text-muted-foreground" />}
-                          </div>
-                          <p className="text-xs text-muted-foreground">
-                            {dateLocked
-                              ? `Signups open ${new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit", timeZoneName: "short" }).format(new Date(d.signupOpensAt!))}`
-                              : formatTime(d.startTime)}
-                          </p>
-                        </div>
-                        <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                      </Link>
-                    )
-                  })}
-                </div>
-              </div>
-            )}
 
           </div>{/* end main content column */}
 
@@ -887,6 +939,118 @@ export function MicPageClient({ slug }: { slug: string }) {
         />
       )}
     </main>
+  )
+}
+
+function DatePillScroller({
+  currentId,
+  currentSlug,
+  currentDate,
+  otherDates,
+}: {
+  currentId: string
+  currentSlug: string
+  currentDate: string
+  otherDates: OtherDate[]
+}) {
+  const scrollRef = useRef<HTMLDivElement>(null)
+  const [canScrollLeft, setCanScrollLeft] = useState(false)
+  const [canScrollRight, setCanScrollRight] = useState(false)
+
+  const checkScroll = useCallback(() => {
+    const el = scrollRef.current
+    if (!el) return
+    setCanScrollLeft(el.scrollLeft > 4)
+    setCanScrollRight(el.scrollLeft + el.clientWidth < el.scrollWidth - 4)
+  }, [])
+
+  useEffect(() => {
+    const el = scrollRef.current
+    if (!el) return
+
+    // Wait for layout to settle before measuring / scrolling
+    const raf = requestAnimationFrame(() => {
+      const current = el.querySelector("[data-current]") as HTMLElement | null
+      if (current) {
+        const left = current.offsetLeft - el.clientWidth / 2 + current.offsetWidth / 2
+        el.scrollLeft = Math.max(0, left)  // instant, no behavior needed
+      }
+      checkScroll()
+    })
+
+    el.addEventListener("scroll", checkScroll, { passive: true })
+    const ro = new ResizeObserver(() => requestAnimationFrame(checkScroll))
+    ro.observe(el)
+    return () => {
+      cancelAnimationFrame(raf)
+      el.removeEventListener("scroll", checkScroll)
+      ro.disconnect()
+    }
+  }, [checkScroll])
+
+  const scroll = (dir: "left" | "right") => {
+    const el = scrollRef.current
+    if (!el) return
+    el.scrollBy({ left: dir === "left" ? -200 : 200, behavior: "smooth" })
+  }
+
+  const sorted = [
+    { id: currentId, slug: currentSlug, date: currentDate, isCurrent: true },
+    ...otherDates.map((d) => ({ ...d, isCurrent: false })),
+  ].sort((a, b) => a.date.localeCompare(b.date))
+
+  return (
+    <div className="relative mb-8 w-full min-w-0">
+      {/* Left fade + arrow */}
+      {canScrollLeft && (
+        <>
+          <div className="pointer-events-none absolute left-0 top-0 h-full w-12 bg-gradient-to-r from-background to-transparent z-10" />
+          <button
+            onClick={() => scroll("left")}
+            className="absolute left-0 top-1/2 -translate-y-1/2 z-20 flex h-8 w-8 items-center justify-center rounded-full bg-card border border-border shadow-sm hover:bg-secondary transition-colors"
+          >
+            <ChevronLeft className="h-4 w-4" />
+          </button>
+        </>
+      )}
+
+      <div ref={scrollRef} className="flex gap-2 overflow-x-auto scrollbar-none px-1 py-1">
+        {sorted.map((d) =>
+          d.isCurrent ? (
+            <div
+              key={d.id}
+              data-current
+              className="flex flex-col items-center justify-center rounded-2xl border-2 border-primary bg-primary/10 px-4 py-3 min-w-[72px] shrink-0"
+            >
+              <span className="text-[11px] font-semibold tracking-wide text-primary">{formatDayAbbr(d.date)}</span>
+              <span className="text-base font-bold text-primary leading-tight">{formatMonthDay(d.date)}</span>
+            </div>
+          ) : (
+            <Link
+              key={d.id}
+              href={`/${d.slug}`}
+              className="flex flex-col items-center justify-center rounded-2xl border border-border bg-card hover:border-primary/50 hover:bg-primary/5 transition-colors px-4 py-3 min-w-[72px] shrink-0"
+            >
+              <span className="text-[11px] font-semibold tracking-wide text-muted-foreground">{formatDayAbbr(d.date)}</span>
+              <span className="text-base font-bold text-foreground leading-tight">{formatMonthDay(d.date)}</span>
+            </Link>
+          )
+        )}
+      </div>
+
+      {/* Right fade + arrow */}
+      {canScrollRight && (
+        <>
+          <div className="pointer-events-none absolute right-0 top-0 h-full w-12 bg-gradient-to-l from-background to-transparent z-10" />
+          <button
+            onClick={() => scroll("right")}
+            className="absolute right-0 top-1/2 -translate-y-1/2 z-20 flex h-8 w-8 items-center justify-center rounded-full bg-card border border-border shadow-sm hover:bg-secondary transition-colors"
+          >
+            <ChevronRight className="h-4 w-4" />
+          </button>
+        </>
+      )}
+    </div>
   )
 }
 

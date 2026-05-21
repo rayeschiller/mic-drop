@@ -137,6 +137,7 @@ export async function createMic(formData: {
   hostPin?: string  // pass to share a PIN across recurring instances
   signupOpensAt?: string | null
   sendReminders?: boolean
+  sendTwoDayReminder?: boolean
   timezone?: string  // IANA zone (e.g. "America/New_York"); used by reminder crons
   placeId?: string | null
   formattedAddress?: string | null
@@ -170,6 +171,7 @@ export async function createMic(formData: {
       series_name: formData.seriesName || null,
       signup_opens_at: formData.signupOpensAt || null,
       send_reminders: formData.sendReminders ?? false,
+      send_two_day_reminder: formData.sendTwoDayReminder ?? false,
       timezone: formData.timezone || null,
       place_id: formData.placeId || null,
       formatted_address: formData.formattedAddress || null,
@@ -368,6 +370,8 @@ export interface MicLocationData {
   longitude: number
   takenSlots: number
   totalSlots: number
+  seriesSlug: string | null
+  moreDatesCount: number
 }
 
 export async function getUpcomingMicsWithLocation(): Promise<MicLocationData[]> {
@@ -376,7 +380,7 @@ export async function getUpcomingMicsWithLocation(): Promise<MicLocationData[]> 
 
   const { data: mics } = await supabase
     .from("mics")
-    .select("id, slug, name, venue, formatted_address, place_id, date, start_time, latitude, longitude, total_slots")
+    .select("id, slug, name, venue, formatted_address, place_id, date, start_time, latitude, longitude, total_slots, series_slug")
     .gte("date", today)
     .not("latitude", "is", null)
     .not("longitude", "is", null)
@@ -385,7 +389,22 @@ export async function getUpcomingMicsWithLocation(): Promise<MicLocationData[]> 
 
   if (!mics?.length) return []
 
-  const micIds = mics.map((m) => m.id)
+  // Count total upcoming dates per series (excluding the first shown)
+  const seriesCount: Record<string, number> = {}
+  for (const m of mics) {
+    if (m.series_slug) seriesCount[m.series_slug] = (seriesCount[m.series_slug] || 0) + 1
+  }
+
+  // For recurring series, keep only the next upcoming date per series
+  const seenSeries = new Set<string>()
+  const dedupedMics = mics.filter((m) => {
+    if (!m.series_slug) return true
+    if (seenSeries.has(m.series_slug)) return false
+    seenSeries.add(m.series_slug)
+    return true
+  })
+
+  const micIds = dedupedMics.map((m) => m.id)
   const { data: slots } = await supabase
     .from("slots")
     .select("mic_id, taken")
@@ -396,7 +415,7 @@ export async function getUpcomingMicsWithLocation(): Promise<MicLocationData[]> 
     if (slot.taken) takenByMic[slot.mic_id] = (takenByMic[slot.mic_id] || 0) + 1
   }
 
-  return mics.map((m) => ({
+  return dedupedMics.map((m) => ({
     id: m.id,
     slug: m.slug,
     name: m.name,
@@ -409,6 +428,8 @@ export async function getUpcomingMicsWithLocation(): Promise<MicLocationData[]> 
     longitude: m.longitude,
     takenSlots: takenByMic[m.id] || 0,
     totalSlots: m.total_slots,
+    seriesSlug: m.series_slug ?? null,
+    moreDatesCount: m.series_slug ? (seriesCount[m.series_slug] || 1) - 1 : 0,
   }))
 }
 

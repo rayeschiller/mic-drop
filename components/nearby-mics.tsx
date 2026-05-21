@@ -46,7 +46,7 @@ type GeoState = 'idle' | 'loading' | 'granted' | 'denied' | 'unsupported'
 
 type MicWithDistance = MicLocationData & { distanceMi: number }
 
-export function NearbyMics() {
+export function NearbyMics({ id }: { id?: string } = {}) {
   const [geoState, setGeoState] = useState<GeoState>('idle')
   const [userLocation, setUserLocation] = useState<[number, number] | null>(null)
   const [allMics, setAllMics] = useState<MicLocationData[]>([])
@@ -100,7 +100,7 @@ export function NearbyMics() {
   if (allMics.length === 0) return null
 
   return (
-    <section className="border-t border-border">
+    <section id={id} className="border-t border-border">
       <div className="mx-auto max-w-5xl px-6 py-24">
         <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-10">
           <div>
@@ -143,9 +143,16 @@ export function NearbyMics() {
                 className="flex items-center justify-between gap-4 rounded-xl border border-border bg-card p-4 hover:border-neon-green transition-colors group"
               >
                 <div className="min-w-0">
-                  <p className="font-bold text-foreground group-hover:text-neon-green transition-colors truncate">
-                    {mic.name}
-                  </p>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <p className="font-bold text-foreground group-hover:text-neon-green transition-colors truncate">
+                      {mic.name}
+                    </p>
+                    {mic.moreDatesCount > 0 && (
+                      <span className="shrink-0 rounded-full bg-primary/10 px-2 py-0.5 text-xs font-semibold text-primary">
+                        +{mic.moreDatesCount} more date{mic.moreDatesCount !== 1 ? 's' : ''}
+                      </span>
+                    )}
+                  </div>
                   <div className="flex items-center gap-1 mt-0.5 text-sm text-muted-foreground">
                     <MapPin className="h-3 w-3 shrink-0" />
                     <span className="truncate">

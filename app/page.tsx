@@ -1,6 +1,6 @@
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
-import { Mic2, Plus, Sparkles } from "lucide-react"
+import { Mic2, Plus, Sparkles, MapPin } from "lucide-react"
 import { NearbyMics } from "@/components/nearby-mics"
 
 export default function HomePage() {
@@ -66,15 +66,16 @@ export default function HomePage() {
                   Create a Mic
                 </Button>
               </Link>
-              <Link href="/create">
+              <a href="#mics-near-you">
                 <Button
                   size="lg"
                   variant="outline"
                   className="h-14 px-8 text-lg font-bold border-2 border-border hover:border-neon-green hover:text-neon-green bg-transparent"
                 >
-                  Get Started
+                  <MapPin className="mr-2 h-5 w-5" />
+                  Find Mics Near You
                 </Button>
-              </Link>
+              </a>
             </div>
           </div>
         </div>
@@ -121,7 +122,7 @@ export default function HomePage() {
         </div>
       </section>
 
-      <NearbyMics />
+      <NearbyMics id="mics-near-you" />
 
       {/* Footer */}
       <footer className="border-t border-border">

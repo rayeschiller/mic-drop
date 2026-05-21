@@ -1,5 +1,5 @@
 import type { Metadata } from "next"
-import { getMic } from "@/app/actions"
+import { getMic, getMicsBySeries } from "@/app/actions"
 import { MicPageClient } from "./mic-page-client"
 
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
@@ -33,5 +33,9 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
 
 export default async function MicPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params
-  return <MicPageClient slug={slug} />
+  const { mic } = await getMic(slug)
+  const otherDates = mic?.seriesSlug
+    ? await getMicsBySeries(mic.seriesSlug, mic.id)
+    : []
+  return <MicPageClient slug={slug} initialMic={mic ?? null} initialOtherDates={otherDates} />
 }

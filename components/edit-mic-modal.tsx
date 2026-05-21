@@ -16,6 +16,7 @@ import { Pencil, Check, X, Loader2, Plus, Trash2 } from "lucide-react"
 import { checkSlugAvailability, type SectionData, type SectionInput } from "@/app/actions"
 import { ImageUpload } from "@/components/image-upload"
 import { SignupReleasePicker } from "@/components/signup-release-picker"
+import { type RecurringFrequency, DAY_LABELS, calcRecurringDates } from "@/lib/recurring"
 
 function toSlug(value: string): string {
   return value
@@ -55,7 +56,12 @@ interface MicEditData {
   sendTwoDayReminder?: boolean
 }
 
-type MicSaveData = Omit<MicEditData, "sections"> & { sections?: SectionInput[] }
+type MicSaveData = Omit<MicEditData, "sections"> & {
+  sections?: SectionInput[]
+  recurringFrequency?: RecurringFrequency
+  recurringEndDate?: string
+  customDays?: number[]
+}
 
 interface EditMicModalProps {
   open: boolean
@@ -91,6 +97,9 @@ export function EditMicModal({
   )
   const [slugStatus, setSlugStatus] = useState<SlugStatus>("unchanged")
   const checkTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const [recurringFrequency, setRecurringFrequency] = useState<RecurringFrequency>("weekly")
+  const [recurringEndDate, setRecurringEndDate] = useState("")
+  const [customDays, setCustomDays] = useState<number[]>([])
 
   const handleOpenChange = (newOpen: boolean) => {
     if (newOpen) {
@@ -151,6 +160,11 @@ export function EditMicModal({
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     if (slugStatus === "taken" || slugStatus === "invalid") return
+    if (recurringFrequency === "custom" && recurringEndDate && customDays.length === 0) return
+
+    const recurringFields = recurringEndDate
+      ? { recurringFrequency, recurringEndDate, customDays }
+      : {}
 
     const { sections: _sections, ...rest } = formData
     if (hasSections || sectionItems.length > 0) {
@@ -163,9 +177,10 @@ export function EditMicModal({
           endTime: s.endTime || undefined,
           slots: s.slots,
         })),
+        ...recurringFields,
       })
     } else {
-      onSave(rest)
+      onSave({ ...rest, ...recurringFields })
     }
     onOpenChange(false)
   }
@@ -434,34 +449,90 @@ export function EditMicModal({
             </p>
           </div>
 
-          {/* Series */}
+          {/* Make Recurring */}
           <div className="space-y-3 rounded-lg border border-border/50 bg-secondary/10 p-3">
-            <Label className="text-sm font-medium">Recurring Series</Label>
+            <Label className="text-sm font-medium">
+              {formData.seriesSlug ? "Add more dates" : "Make Recurring"}
+            </Label>
+            <p className="text-xs text-muted-foreground">
+              {formData.seriesSlug
+                ? `Part of series "${formData.seriesName || formData.seriesSlug}". Set a frequency and end date to generate additional linked dates.`
+                : "Turn this into a recurring series by setting a frequency and end date. New mic pages will be created for each date and linked together."}
+            </p>
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
-                <Label className="text-xs font-medium text-muted-foreground">Series Name</Label>
-                <Input
-                  placeholder='e.g. "Tuesday Nights"'
-                  value={formData.seriesName || ""}
-                  onChange={(e) => setFormData({ ...formData, seriesName: e.target.value })}
-                  className="h-9 text-sm border-border bg-secondary/50 focus:border-primary"
-                />
+                <Label className="text-xs font-medium text-muted-foreground">Frequency</Label>
+                <select
+                  value={recurringFrequency}
+                  onChange={(e) => {
+                    const freq = e.target.value as RecurringFrequency
+                    setRecurringFrequency(freq)
+                    if (freq === "custom" && formData.date) {
+                      const day = new Date(formData.date + "T00:00:00").getDay()
+                      setCustomDays((prev) => prev.includes(day) ? prev : [...prev, day])
+                    }
+                  }}
+                  className="w-full h-9 rounded-md border border-border bg-secondary/50 px-3 text-sm focus:border-primary focus:outline-none"
+                >
+                  <option value="weekly">Weekly</option>
+                  <option value="biweekly">Biweekly</option>
+                  <option value="monthly">Monthly</option>
+                  <option value="custom">Custom days</option>
+                </select>
               </div>
               <div className="space-y-1.5">
-                <Label className="text-xs font-medium text-muted-foreground">Series ID</Label>
+                <Label className="text-xs font-medium text-muted-foreground">End Date</Label>
                 <Input
-                  placeholder='e.g. "tuesday-nights"'
-                  value={formData.seriesSlug || ""}
-                  onChange={(e) =>
-                    setFormData({ ...formData, seriesSlug: toSlug(e.target.value) })
-                  }
+                  type="date"
+                  value={recurringEndDate}
+                  min={formData.date || undefined}
+                  onChange={(e) => setRecurringEndDate(e.target.value)}
                   className="h-9 text-sm border-border bg-secondary/50 focus:border-primary"
                 />
               </div>
             </div>
-            <p className="text-xs text-muted-foreground">
-              Leave blank if this is a one-off event.
-            </p>
+
+            {recurringFrequency === "custom" && (
+              <div className="space-y-1.5">
+                <Label className="text-xs font-medium text-muted-foreground">Repeat on</Label>
+                <div className="flex gap-1.5 flex-wrap">
+                  {DAY_LABELS.map((label, idx) => {
+                    const active = customDays.includes(idx)
+                    return (
+                      <button
+                        key={idx}
+                        type="button"
+                        onClick={() => setCustomDays((prev) =>
+                          active ? prev.filter((d) => d !== idx) : [...prev, idx]
+                        )}
+                        className={`h-9 w-9 rounded-full text-xs font-bold transition-colors ${
+                          active
+                            ? "bg-neon-pink text-white"
+                            : "border border-border bg-secondary/50 text-muted-foreground hover:border-neon-pink hover:text-neon-pink"
+                        }`}
+                      >
+                        {label}
+                      </button>
+                    )
+                  })}
+                </div>
+                {recurringEndDate && customDays.length === 0 && (
+                  <p className="text-xs text-destructive">Select at least one day.</p>
+                )}
+              </div>
+            )}
+
+            {recurringEndDate && formData.date && (
+              <p className="text-xs text-muted-foreground">
+                {(() => {
+                  const extra = calcRecurringDates(formData.date, recurringFrequency, recurringEndDate, customDays)
+                  const total = extra.length + 1
+                  return total > 1
+                    ? `Creates ${total} dates total — all linked and sharing one host PIN.`
+                    : "No additional dates in range."
+                })()}
+              </p>
+            )}
           </div>
 
           <SignupReleasePicker
