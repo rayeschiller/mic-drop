@@ -106,6 +106,10 @@ export function EditMicModal({
       setFormData(micData)
       setSectionItems(hasSections ? sectionsToFormItems(micData.sections!) : [])
       setSlugStatus("unchanged")
+      // Always reset recurring fields so stale state from a previous open can't sneak through
+      setRecurringFrequency("weekly")
+      setRecurringEndDate("")
+      setCustomDays([])
     }
     onOpenChange(newOpen)
   }
@@ -139,6 +143,9 @@ export function EditMicModal({
     setFormData(micData)
     setSectionItems(hasSections ? sectionsToFormItems(micData.sections!) : [])
     setSlugStatus("unchanged")
+    setRecurringFrequency("weekly")
+    setRecurringEndDate("")
+    setCustomDays([])
   }, [micData]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const updateSectionItem = (idx: number, update: Partial<SectionFormItem>) => {
