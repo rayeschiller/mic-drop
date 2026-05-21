@@ -70,7 +70,7 @@ export default function HomePage() {
                 <Button
                   size="lg"
                   variant="outline"
-                  className="h-14 px-8 text-lg font-bold border-2 border-border hover:border-neon-green hover:text-neon-green bg-transparent"
+                  className="h-14 px-8 text-lg font-bold border-2 border-border hover:border-neon-green hover:text-neon-green hover:bg-neon-green/15 bg-transparent"
                 >
                   <MapPin className="mr-2 h-5 w-5" />
                   Find Mics Near You

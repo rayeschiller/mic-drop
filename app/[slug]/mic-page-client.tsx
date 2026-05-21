@@ -444,7 +444,8 @@ export function MicPageClient({
           sendReminders: data.sendReminders,
           sendTwoDayReminder: data.sendTwoDayReminder,
           timezone,
-          // Carry forward location from the original mic
+          // Carry forward location and image from the original mic
+          imageUrl: mic?.imageUrl ?? undefined,
           placeId: mic?.placeId ?? null,
           formattedAddress: mic?.formattedAddress ?? null,
           latitude: mic?.latitude ?? null,
