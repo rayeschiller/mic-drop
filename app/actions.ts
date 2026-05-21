@@ -389,10 +389,19 @@ export async function getUpcomingMicsWithLocation(): Promise<MicLocationData[]> 
 
   if (!mics?.length) return []
 
-  // Count total upcoming dates per series (excluding the first shown)
+  // Count ALL future dates per series (regardless of whether they have location),
+  // so the moreDatesCount reflects the true series size.
+  const seriesSlugs = [...new Set(mics.map((m) => m.series_slug).filter(Boolean))] as string[]
   const seriesCount: Record<string, number> = {}
-  for (const m of mics) {
-    if (m.series_slug) seriesCount[m.series_slug] = (seriesCount[m.series_slug] || 0) + 1
+  if (seriesSlugs.length > 0) {
+    const { data: allSeriesDates } = await supabase
+      .from("mics")
+      .select("series_slug")
+      .gte("date", today)
+      .in("series_slug", seriesSlugs)
+    for (const m of allSeriesDates || []) {
+      if (m.series_slug) seriesCount[m.series_slug] = (seriesCount[m.series_slug] || 0) + 1
+    }
   }
 
   // For recurring series, keep only the next upcoming date per series
