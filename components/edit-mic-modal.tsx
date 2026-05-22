@@ -61,6 +61,7 @@ type MicSaveData = Omit<MicEditData, "sections"> & {
   recurringFrequency?: RecurringFrequency
   recurringEndDate?: string
   customDays?: number[]
+  applyToSeries?: boolean
 }
 
 interface EditMicModalProps {
@@ -100,6 +101,7 @@ export function EditMicModal({
   const [recurringFrequency, setRecurringFrequency] = useState<RecurringFrequency>("weekly")
   const [recurringEndDate, setRecurringEndDate] = useState("")
   const [customDays, setCustomDays] = useState<number[]>([])
+  const [applyToSeries, setApplyToSeries] = useState(true)
 
   const handleOpenChange = (newOpen: boolean) => {
     if (newOpen) {
@@ -110,6 +112,7 @@ export function EditMicModal({
       setRecurringFrequency("weekly")
       setRecurringEndDate("")
       setCustomDays([])
+      setApplyToSeries(true)
     }
     onOpenChange(newOpen)
   }
@@ -146,6 +149,7 @@ export function EditMicModal({
     setRecurringFrequency("weekly")
     setRecurringEndDate("")
     setCustomDays([])
+    setApplyToSeries(true)
   }, [micData]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const updateSectionItem = (idx: number, update: Partial<SectionFormItem>) => {
@@ -185,9 +189,10 @@ export function EditMicModal({
           slots: s.slots,
         })),
         ...recurringFields,
+        applyToSeries: !!formData.seriesSlug && applyToSeries,
       })
     } else {
-      onSave({ ...rest, ...recurringFields })
+      onSave({ ...rest, ...recurringFields, applyToSeries: !!formData.seriesSlug && applyToSeries })
     }
     onOpenChange(false)
   }
@@ -208,6 +213,24 @@ export function EditMicModal({
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-4 mt-4">
+          {/* Series sync toggle — shown whenever this mic is part of a series */}
+          {formData.seriesSlug && (
+            <label className="flex items-center gap-3 cursor-pointer rounded-lg border border-primary/30 bg-primary/5 px-4 py-3">
+              <input
+                type="checkbox"
+                checked={applyToSeries}
+                onChange={(e) => setApplyToSeries(e.target.checked)}
+                className="h-4 w-4 accent-neon-pink shrink-0"
+              />
+              <div>
+                <span className="text-sm font-bold">Update all dates in this series</span>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Applies name, venue, notes, image, location, and time changes to every date. Each date keeps its own lineup.
+                </p>
+              </div>
+            </label>
+          )}
+
           <div className="space-y-2">
             <Label htmlFor="edit-name" className="text-foreground font-medium">
               Mic Name

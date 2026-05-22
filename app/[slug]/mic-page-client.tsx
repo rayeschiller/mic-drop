@@ -38,6 +38,7 @@ import {
   verifyHostPin,
   hostRemoveSlot,
   hostUpdateMic,
+  hostUpdateSeriesMics,
   createMic,
   joinWaitlist,
   leaveWaitlist,
@@ -402,13 +403,14 @@ export function MicPageClient({
     recurringFrequency?: RecurringFrequency
     recurringEndDate?: string
     customDays?: number[]
+    applyToSeries?: boolean
   }) => {
     if (!hostPin) return
     const timezone =
       (typeof Intl !== "undefined" && Intl.DateTimeFormat().resolvedOptions().timeZone) ||
       undefined
 
-    const { recurringFrequency, recurringEndDate, customDays, ...updateData } = data
+    const { recurringFrequency, recurringEndDate, customDays, applyToSeries, ...updateData } = data
 
     // If making recurring, assign a series slug to this mic first
     const newSeriesSlug = recurringEndDate && !data.seriesSlug
@@ -423,6 +425,27 @@ export function MicPageClient({
     })
 
     if (!result.success) return
+
+    // Bulk-update all other dates in the series with shared fields
+    if (applyToSeries && newSeriesSlug) {
+      await hostUpdateSeriesMics(slug, hostPin, newSeriesSlug, {
+        name: data.name,
+        venue: data.venue,
+        notes: data.notes,
+        imageUrl: data.imageUrl,
+        seriesName: data.seriesName || data.name,
+        startTime: data.startTime,
+        endTime: data.endTime || undefined,
+        sections: data.sections,
+        sendReminders: data.sendReminders,
+        sendTwoDayReminder: data.sendTwoDayReminder,
+        timezone,
+        placeId: mic?.placeId ?? null,
+        formattedAddress: mic?.formattedAddress ?? null,
+        latitude: mic?.latitude ?? null,
+        longitude: mic?.longitude ?? null,
+      })
+    }
 
     // Create future recurring instances
     if (recurringEndDate && recurringFrequency && newSeriesSlug) {

@@ -827,6 +827,91 @@ export async function hostUpdateMic(
   return { success: true, newSlug: newSlug !== micSlug ? newSlug : undefined }
 }
 
+// Update shared fields across all mics in a series (name, venue, notes, image, location, reminders, times)
+// Each date keeps its own date, slug, slots/lineup, and signupOpensAt.
+export async function hostUpdateSeriesMics(
+  micSlug: string,
+  pin: string,
+  seriesSlug: string,
+  data: {
+    name: string
+    venue: string
+    notes?: string
+    imageUrl?: string | null
+    seriesName?: string | null
+    startTime?: string
+    endTime?: string
+    sections?: SectionInput[]
+    sendReminders?: boolean
+    sendTwoDayReminder?: boolean
+    timezone?: string
+    placeId?: string | null
+    formattedAddress?: string | null
+    latitude?: number | null
+    longitude?: number | null
+  }
+): Promise<{ success: boolean; error?: string }> {
+  const verified = await verifyHostPin(micSlug, pin)
+  if (!verified.success) return { success: false, error: "Unauthorized" }
+
+  const admin = createAdminClient()
+
+  // Fetch all mics in the series
+  const { data: seriesMics } = await admin
+    .from("mics")
+    .select("id, slug, total_slots")
+    .eq("series_slug", seriesSlug)
+
+  if (!seriesMics?.length) return { success: false, error: "Series not found" }
+
+  // Derive time fields
+  let startTime = data.startTime || ""
+  let endTime = data.endTime || null
+  if (data.sections && data.sections.length > 0) {
+    startTime = data.sections[0].startTime
+    endTime = data.sections[0].endTime || null
+  }
+
+  // Shared fields to update on every date (excludes date, slug, signup_opens_at, total_slots)
+  const sharedUpdate = {
+    name: data.name,
+    venue: data.venue,
+    notes: data.notes || null,
+    image_url: data.imageUrl !== undefined ? data.imageUrl : undefined,
+    series_name: data.seriesName !== undefined ? data.seriesName : undefined,
+    start_time: startTime || undefined,
+    end_time: endTime,
+    send_reminders: data.sendReminders !== undefined ? data.sendReminders : undefined,
+    send_two_day_reminder: data.sendTwoDayReminder !== undefined ? data.sendTwoDayReminder : undefined,
+    timezone: data.timezone || undefined,
+    place_id: data.placeId !== undefined ? data.placeId : undefined,
+    formatted_address: data.formattedAddress !== undefined ? data.formattedAddress : undefined,
+    latitude: data.latitude !== undefined ? data.latitude : undefined,
+    longitude: data.longitude !== undefined ? data.longitude : undefined,
+  }
+
+  const { error } = await admin
+    .from("mics")
+    .update(sharedUpdate)
+    .eq("series_slug", seriesSlug)
+
+  if (error) {
+    console.error("Failed to update series mics:", error)
+    return { success: false, error: "Failed to update series" }
+  }
+
+  // Update sections on every mic in the series if sections were provided
+  if (data.sections && data.sections.length > 0) {
+    for (const mic of seriesMics) {
+      // Map sections without IDs so each mic gets its own section rows
+      const sectionsWithoutIds = data.sections.map(({ id: _id, ...s }) => s)
+      await updateSections(admin, mic.id, sectionsWithoutIds)
+    }
+  }
+
+  return { success: true }
+}
+
 async function updateSections(
   admin: ReturnType<typeof createAdminClient>,
   micId: string,
