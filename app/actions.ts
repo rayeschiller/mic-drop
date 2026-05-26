@@ -74,6 +74,10 @@ export interface MicData {
   sendTwoDayReminder: boolean
   waitlistCount: number
   waitlist?: WaitlistEntry[]  // only populated in host mode
+  placeId: string | null
+  formattedAddress: string | null
+  latitude: number | null
+  longitude: number | null
 }
 
 export interface WaitlistEntry {
@@ -133,7 +137,12 @@ export async function createMic(formData: {
   hostPin?: string  // pass to share a PIN across recurring instances
   signupOpensAt?: string | null
   sendReminders?: boolean
+  sendTwoDayReminder?: boolean
   timezone?: string  // IANA zone (e.g. "America/New_York"); used by reminder crons
+  placeId?: string | null
+  formattedAddress?: string | null
+  latitude?: number | null
+  longitude?: number | null
 }): Promise<{ success: boolean; slug?: string; hostPin?: string; error?: string }> {
   const admin = createAdminClient()
   const slug = formData.slug?.trim() || generateSlug(formData.name)
@@ -162,7 +171,12 @@ export async function createMic(formData: {
       series_name: formData.seriesName || null,
       signup_opens_at: formData.signupOpensAt || null,
       send_reminders: formData.sendReminders ?? false,
+      send_two_day_reminder: formData.sendTwoDayReminder ?? false,
       timezone: formData.timezone || null,
+      place_id: formData.placeId || null,
+      formatted_address: formData.formattedAddress || null,
+      latitude: formData.latitude ?? null,
+      longitude: formData.longitude ?? null,
     })
     .select("id")
     .single()
@@ -296,6 +310,10 @@ function buildMicData(
     sendTwoDayReminder: (mic.send_two_day_reminder as boolean) ?? false,
     waitlistCount,
     waitlist,
+    placeId: mic.place_id as string | null,
+    formattedAddress: mic.formatted_address as string | null,
+    latitude: mic.latitude as number | null,
+    longitude: mic.longitude as number | null,
   }
 }
 
@@ -337,6 +355,91 @@ export async function getMic(slug: string): Promise<{ mic: MicData | null; error
   return {
     mic: buildMicData(mic, slots, sections, false, waitlistCount ?? 0),
   }
+}
+
+export interface MicLocationData {
+  id: string
+  slug: string
+  name: string
+  venue: string
+  formattedAddress: string | null
+  placeId: string | null
+  date: string
+  startTime: string
+  latitude: number
+  longitude: number
+  takenSlots: number
+  totalSlots: number
+  seriesSlug: string | null
+  moreDatesCount: number
+}
+
+export async function getUpcomingMicsWithLocation(): Promise<MicLocationData[]> {
+  const supabase = await createClient()
+  const today = new Date().toISOString().split("T")[0]
+
+  const { data: mics } = await supabase
+    .from("mics")
+    .select("id, slug, name, venue, formatted_address, place_id, date, start_time, latitude, longitude, total_slots, series_slug")
+    .gte("date", today)
+    .not("latitude", "is", null)
+    .not("longitude", "is", null)
+    .order("date", { ascending: true })
+    .limit(200)
+
+  if (!mics?.length) return []
+
+  // Count ALL future dates per series (regardless of whether they have location),
+  // so the moreDatesCount reflects the true series size.
+  const seriesSlugs = [...new Set(mics.map((m) => m.series_slug).filter(Boolean))] as string[]
+  const seriesCount: Record<string, number> = {}
+  if (seriesSlugs.length > 0) {
+    const { data: allSeriesDates } = await supabase
+      .from("mics")
+      .select("series_slug")
+      .gte("date", today)
+      .in("series_slug", seriesSlugs)
+    for (const m of allSeriesDates || []) {
+      if (m.series_slug) seriesCount[m.series_slug] = (seriesCount[m.series_slug] || 0) + 1
+    }
+  }
+
+  // For recurring series, keep only the next upcoming date per series
+  const seenSeries = new Set<string>()
+  const dedupedMics = mics.filter((m) => {
+    if (!m.series_slug) return true
+    if (seenSeries.has(m.series_slug)) return false
+    seenSeries.add(m.series_slug)
+    return true
+  })
+
+  const micIds = dedupedMics.map((m) => m.id)
+  const { data: slots } = await supabase
+    .from("slots")
+    .select("mic_id, taken")
+    .in("mic_id", micIds)
+
+  const takenByMic: Record<string, number> = {}
+  for (const slot of slots || []) {
+    if (slot.taken) takenByMic[slot.mic_id] = (takenByMic[slot.mic_id] || 0) + 1
+  }
+
+  return dedupedMics.map((m) => ({
+    id: m.id,
+    slug: m.slug,
+    name: m.name,
+    venue: m.venue,
+    formattedAddress: m.formatted_address,
+    placeId: m.place_id,
+    date: m.date,
+    startTime: m.start_time,
+    latitude: m.latitude,
+    longitude: m.longitude,
+    takenSlots: takenByMic[m.id] || 0,
+    totalSlots: m.total_slots,
+    seriesSlug: m.series_slug ?? null,
+    moreDatesCount: m.series_slug ? (seriesCount[m.series_slug] || 1) - 1 : 0,
+  }))
 }
 
 export async function signupForSlot(
@@ -724,6 +827,107 @@ export async function hostUpdateMic(
   return { success: true, newSlug: newSlug !== micSlug ? newSlug : undefined }
 }
 
+// Update shared fields across all mics in a series (name, venue, notes, image, location, reminders, times)
+// Each date keeps its own date, slug, slots/lineup, and signupOpensAt.
+export async function hostUpdateSeriesMics(
+  micSlug: string,
+  pin: string,
+  seriesSlug: string,
+  data: {
+    name: string
+    venue: string
+    notes?: string
+    imageUrl?: string | null
+    seriesName?: string | null
+    startTime?: string
+    endTime?: string
+    sections?: SectionInput[]
+    sendReminders?: boolean
+    sendTwoDayReminder?: boolean
+    timezone?: string
+    placeId?: string | null
+    formattedAddress?: string | null
+    latitude?: number | null
+    longitude?: number | null
+  }
+): Promise<{ success: boolean; error?: string }> {
+  const verified = await verifyHostPin(micSlug, pin)
+  if (!verified.success) return { success: false, error: "Unauthorized" }
+
+  const admin = createAdminClient()
+
+  // Fetch all mics in the series
+  const { data: seriesMics } = await admin
+    .from("mics")
+    .select("id, slug, total_slots")
+    .eq("series_slug", seriesSlug)
+
+  if (!seriesMics?.length) return { success: false, error: "Series not found" }
+
+  // Derive time fields
+  let startTime = data.startTime || ""
+  let endTime = data.endTime || null
+  if (data.sections && data.sections.length > 0) {
+    startTime = data.sections[0].startTime
+    endTime = data.sections[0].endTime || null
+  }
+
+  // Shared fields to update on every date (excludes date, slug, signup_opens_at, total_slots)
+  const sharedUpdate = {
+    name: data.name,
+    venue: data.venue,
+    notes: data.notes || null,
+    image_url: data.imageUrl !== undefined ? data.imageUrl : undefined,
+    series_name: data.seriesName !== undefined ? data.seriesName : undefined,
+    start_time: startTime || undefined,
+    end_time: endTime,
+    send_reminders: data.sendReminders !== undefined ? data.sendReminders : undefined,
+    send_two_day_reminder: data.sendTwoDayReminder !== undefined ? data.sendTwoDayReminder : undefined,
+    timezone: data.timezone || undefined,
+    place_id: data.placeId !== undefined ? data.placeId : undefined,
+    formatted_address: data.formattedAddress !== undefined ? data.formattedAddress : undefined,
+    latitude: data.latitude !== undefined ? data.latitude : undefined,
+    longitude: data.longitude !== undefined ? data.longitude : undefined,
+  }
+
+  const { error } = await admin
+    .from("mics")
+    .update(sharedUpdate)
+    .eq("series_slug", seriesSlug)
+
+  if (error) {
+    console.error("Failed to update series mics:", error)
+    return { success: false, error: "Failed to update series" }
+  }
+
+  // Update sections on every mic in the series if sections were provided.
+  // Skip section restructuring for any mic that already has performers in its sections —
+  // deleting/recreating sections would orphan their slot records.
+  if (data.sections && data.sections.length > 0) {
+    // Find which mics have taken slots in any section
+    const micIds = seriesMics.map((m) => m.id)
+    const { data: takenSlots } = await admin
+      .from("slots")
+      .select("mic_id")
+      .in("mic_id", micIds)
+      .eq("taken", true)
+      .not("section_id", "is", null)
+
+    const micsWithTakenSectionSlots = new Set((takenSlots || []).map((s) => s.mic_id as string))
+
+    for (const mic of seriesMics) {
+      if (micsWithTakenSectionSlots.has(mic.id)) {
+        // This date has performers — skip section restructuring, shared fields already updated above
+        continue
+      }
+      const sectionsWithoutIds = data.sections.map(({ id: _id, ...s }) => s)
+      await updateSections(admin, mic.id, sectionsWithoutIds)
+    }
+  }
+
+  return { success: true }
+}
+
 async function updateSections(
   admin: ReturnType<typeof createAdminClient>,
   micId: string,
@@ -966,12 +1170,12 @@ export async function hostRemoveWaitlistEntry(
 export async function getMicsBySeries(
   seriesSlug: string,
   currentMicId: string
-): Promise<{ id: string; slug: string; name: string; date: string; startTime: string; signupOpensAt: string | null }[]> {
+): Promise<{ id: string; slug: string; name: string; date: string; startTime: string; signupOpensAt: string | null; imageUrl: string | null }[]> {
   const admin = createAdminClient()
 
   const { data } = await admin
     .from("mics")
-    .select("id, slug, name, date, start_time, signup_opens_at")
+    .select("id, slug, name, date, start_time, signup_opens_at, image_url")
     .eq("series_slug", seriesSlug)
     .neq("id", currentMicId)
     .order("date", { ascending: true })
@@ -983,5 +1187,6 @@ export async function getMicsBySeries(
     date: m.date,
     startTime: m.start_time,
     signupOpensAt: m.signup_opens_at,
+    imageUrl: m.image_url ?? null,
   }))
 }

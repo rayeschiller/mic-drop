@@ -4,6 +4,7 @@ import { Space_Grotesk, Space_Mono } from 'next/font/google'
 import { Analytics } from '@vercel/analytics/next'
 import { ThemeProvider } from '@/components/theme-provider'
 import { ThemeToggle } from '@/components/theme-toggle'
+import { GoogleMapsProvider } from '@/components/google-maps-provider'
 import './globals.css'
 
 const spaceGrotesk = Space_Grotesk({ subsets: ["latin"] });
@@ -55,7 +56,8 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body className={`font-sans antialiased min-h-screen flex flex-col`}>
-        <ThemeProvider attribute="class" defaultTheme="dark" enableSystem={false}>
+        <GoogleMapsProvider>
+        <ThemeProvider attribute="class" defaultTheme="light" enableSystem={false}>
           <div className="flex-1">{children}</div>
           <footer className="border-t border-border py-6 px-6 text-sm text-muted-foreground">
             <div className="mx-auto max-w-5xl flex flex-col sm:flex-row items-center justify-between gap-3">
@@ -78,6 +80,7 @@ export default function RootLayout({
           </footer>
           <Analytics />
         </ThemeProvider>
+        </GoogleMapsProvider>
       </body>
     </html>
   )

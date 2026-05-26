@@ -9,30 +9,11 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Sparkles, Check, X, Loader2, Plus, Trash2, RepeatIcon } from "lucide-react"
 import { createMic, checkSlugAvailability } from "@/app/actions"
+import { PlaceAutocomplete, type PlaceResult } from "@/components/place-autocomplete"
 import { ImageUpload } from "@/components/image-upload"
 import { SignupReleasePicker } from "@/components/signup-release-picker"
 
-type RecurringFrequency = "weekly" | "biweekly" | "monthly"
-
-function calcRecurringDates(startDate: string, frequency: RecurringFrequency, endDate: string): string[] {
-  const dates: string[] = []
-  const end = new Date(endDate + "T00:00:00")
-  let current = new Date(startDate + "T00:00:00")
-  current.setDate(current.getDate() + (frequency === "weekly" ? 7 : frequency === "biweekly" ? 14 : 0))
-
-  while (current <= end) {
-    dates.push(current.toISOString().split("T")[0])
-    if (frequency === "monthly") {
-      current = new Date(current)
-      current.setMonth(current.getMonth() + 1)
-    } else {
-      current = new Date(current)
-      current.setDate(current.getDate() + (frequency === "weekly" ? 7 : 14))
-    }
-    if (dates.length >= 52) break // safety cap
-  }
-  return dates
-}
+import { type RecurringFrequency, DAY_LABELS, calcRecurringDates } from "@/lib/recurring"
 
 function toSlug(value: string): string {
   return value
@@ -68,15 +49,18 @@ export function CreateMicForm() {
     notes: "",
     hostEmail: "",
   })
+  const [place, setPlace] = useState<PlaceResult | null>(null)
 
   const [isRecurring, setIsRecurring] = useState(false)
   const [recurringFrequency, setRecurringFrequency] = useState<RecurringFrequency>("weekly")
   const [recurringEndDate, setRecurringEndDate] = useState("")
+  const [customDays, setCustomDays] = useState<number[]>([])
   const [createdCount, setCreatedCount] = useState(0)
   const [sections, setSections] = useState<SectionFormData[]>(emptySections())
   const [imageUrl, setImageUrl] = useState<string | null>(null)
   const [signupOpensAt, setSignupOpensAt] = useState<string | null>(null)
   const [sendReminders, setSendReminders] = useState(true)
+  const [sendTwoDayReminder, setSendTwoDayReminder] = useState(true)
 
   const [slug, setSlug] = useState("")
   const [slugManuallyEdited, setSlugManuallyEdited] = useState(false)
@@ -147,6 +131,10 @@ export function CreateMicForm() {
       setSubmitError("That URL is already taken. Choose a different one.")
       return
     }
+    if (isRecurring && recurringFrequency === "custom" && customDays.length === 0) {
+      setSubmitError("Select at least one day for the custom schedule.")
+      return
+    }
     setIsSubmitting(true)
     setSubmitError(null)
 
@@ -168,6 +156,10 @@ export function CreateMicForm() {
       (typeof Intl !== "undefined" && Intl.DateTimeFormat().resolvedOptions().timeZone) ||
       "America/Los_Angeles"
 
+    const locationData = place
+      ? { placeId: place.placeId, formattedAddress: place.formattedAddress, latitude: place.latitude, longitude: place.longitude }
+      : {}
+
     const result = await createMic({
       ...formData,
       slug: slug || undefined,
@@ -179,7 +171,9 @@ export function CreateMicForm() {
       sections: sectionPayload,
       signupOpensAt: signupOpensAt || undefined,
       sendReminders,
+      sendTwoDayReminder,
       timezone,
+      ...locationData,
     })
 
     if (!result.success || !result.slug || !result.hostPin) {
@@ -190,14 +184,14 @@ export function CreateMicForm() {
 
     // Create additional recurring instances if needed
     if (isRecurring && recurringEndDate && seriesSlug) {
-      const extraDates = calcRecurringDates(formData.date, recurringFrequency, recurringEndDate)
+      const extraDates = calcRecurringDates(formData.date, recurringFrequency, recurringEndDate, customDays)
       let count = 1
       for (const date of extraDates) {
         const extra = await createMic({
           ...formData,
           date,
           slug: undefined, // auto-generate for each
-          hostEmail: formData.hostEmail,
+          hostEmail: "", // email already sent for the first date
           imageUrl: imageUrl || undefined,
           seriesSlug,
           seriesName,
@@ -205,7 +199,9 @@ export function CreateMicForm() {
           sections: sectionPayload,
           signupOpensAt: signupOpensAt || undefined,
           sendReminders,
+          sendTwoDayReminder,
           timezone,
+          ...locationData,
         })
         if (extra.success) count++
       }
@@ -255,8 +251,59 @@ export function CreateMicForm() {
     )
   }
 
+  const fillTestData = () => {
+    const today = new Date()
+    today.setDate(today.getDate() + 7)
+    const date = today.toISOString().split("T")[0]
+    const names = [
+      "Sweaty Palms Open Mic",
+      "Cry Laughing Comedy Night",
+      "The Basement Stinker Showcase",
+      "Nobody Asked But Here We Are",
+      "Please Laugh Open Mic",
+      "Comedy for People Who Hate Comedy",
+      "The Awkward Pause Invitational",
+      "Bombers Anonymous Weekly",
+      "Sir Laughs-a-Lot's Sad Hour",
+      "Yell Into the Void Tuesdays",
+    ]
+    const venues = [
+      "The Sad Clown Saloon",
+      "Chuckle Dungeon",
+      "The Weeping Willow Bar",
+      "Guffaw Palace",
+      "The Discount Laff Shack",
+    ]
+    const notes = [
+      "5 mins each. No crowd work. Bring your own tears.",
+      "Keep it tight or we unplug the mic. No exceptions. Yes, even you.",
+      "Tags welcome. Crowd work forbidden. Crying in the bathroom: permitted.",
+      "This is a safe space. Unless you're doing hacky airplane jokes.",
+      "7 minutes hard cap. The light is a suggestion. The bouncer is not.",
+    ]
+    const pick = <T,>(arr: T[]) => arr[Math.floor(Math.random() * arr.length)]
+    setFormData({
+      name: pick(names),
+      venue: pick(venues),
+      date,
+      notes: pick(notes),
+      hostEmail: "test@example.com",
+    })
+    setSections([{ name: "", startTime: "19:00", endTime: "21:00", slots: 8 }])
+    setSlugManuallyEdited(false)
+  }
+
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
+      {process.env.NODE_ENV === "development" && (
+        <button
+          type="button"
+          onClick={fillTestData}
+          className="w-full rounded-lg border border-dashed border-yellow-500/50 bg-yellow-500/10 py-2 text-sm text-yellow-600 dark:text-yellow-400 hover:bg-yellow-500/20 transition-colors"
+        >
+          Fill test data
+        </button>
+      )}
       <div className="space-y-2">
         <Label htmlFor="name" className="text-lg font-bold">
           Mic Name <span className="text-neon-pink">*</span>
@@ -332,6 +379,14 @@ export function CreateMicForm() {
           required
           className="h-12 text-lg border-border bg-secondary/50 focus:border-neon-pink placeholder:text-muted-foreground/50"
         />
+      </div>
+
+      <div className="space-y-2">
+        <Label className="text-lg font-bold">Venue Location</Label>
+        <PlaceAutocomplete value={place} onChange={setPlace} />
+        <p className="text-sm text-muted-foreground">
+          Optional — shows your mic on the map so comedians can find mics near them.
+        </p>
       </div>
 
       <div className="space-y-2">
@@ -483,20 +538,29 @@ export function CreateMicForm() {
         </label>
 
         {isRecurring && (
-          <div className="grid grid-cols-2 gap-3 pt-1">
-            <div className="space-y-1.5">
-              <Label className="text-sm font-medium">Frequency</Label>
-              <select
-                value={recurringFrequency}
-                onChange={(e) => setRecurringFrequency(e.target.value as RecurringFrequency)}
-                className="w-full h-10 rounded-md border border-border bg-secondary/50 px-3 text-sm focus:border-neon-pink focus:outline-none"
-              >
-                <option value="weekly">Weekly</option>
-                <option value="biweekly">Biweekly</option>
-                <option value="monthly">Monthly</option>
-              </select>
-            </div>
-            <div className="space-y-1.5">
+          <div className="space-y-3 pt-1">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label className="text-sm font-medium">Frequency</Label>
+                <select
+                  value={recurringFrequency}
+                  onChange={(e) => {
+                    const freq = e.target.value as RecurringFrequency
+                    setRecurringFrequency(freq)
+                    if (freq === "custom" && formData.date) {
+                      const day = new Date(formData.date + "T00:00:00").getDay()
+                      setCustomDays((prev) => prev.includes(day) ? prev : [...prev, day])
+                    }
+                  }}
+                  className="w-full h-10 rounded-md border border-border bg-secondary/50 px-3 text-sm focus:border-neon-pink focus:outline-none"
+                >
+                  <option value="weekly">Weekly</option>
+                  <option value="biweekly">Biweekly</option>
+                  <option value="monthly">Monthly</option>
+                  <option value="custom">Custom days</option>
+                </select>
+              </div>
+              <div className="space-y-1.5">
               <Label htmlFor="recurringEndDate" className="text-sm font-medium">
                 End Date <span className="text-neon-pink">*</span>
               </Label>
@@ -511,12 +575,43 @@ export function CreateMicForm() {
               />
             </div>
           </div>
+
+          {recurringFrequency === "custom" && (
+            <div className="space-y-1.5">
+              <Label className="text-sm font-medium">Repeat on</Label>
+              <div className="flex gap-1.5 flex-wrap">
+                {DAY_LABELS.map((label, idx) => {
+                  const active = customDays.includes(idx)
+                  return (
+                    <button
+                      key={idx}
+                      type="button"
+                      onClick={() => setCustomDays((prev) =>
+                        active ? prev.filter((d) => d !== idx) : [...prev, idx]
+                      )}
+                      className={`h-9 w-9 rounded-full text-xs font-bold transition-colors ${
+                        active
+                          ? "bg-neon-pink text-white"
+                          : "border border-border bg-secondary/50 text-muted-foreground hover:border-neon-pink hover:text-neon-pink"
+                      }`}
+                    >
+                      {label}
+                    </button>
+                  )
+                })}
+              </div>
+              {customDays.length === 0 && (
+                <p className="text-xs text-destructive">Select at least one day.</p>
+              )}
+            </div>
+          )}
+          </div>
         )}
 
         {isRecurring && formData.date && recurringEndDate && (
           <p className="text-xs text-muted-foreground">
             {(() => {
-              const extra = calcRecurringDates(formData.date, recurringFrequency, recurringEndDate)
+              const extra = calcRecurringDates(formData.date, recurringFrequency, recurringEndDate, customDays)
               const total = extra.length + 1
               return total > 1
                 ? `Creates ${total} dates total — all linked and sharing one host PIN.`
@@ -547,7 +642,22 @@ export function CreateMicForm() {
         onChange={setSignupOpensAt}
       />
 
-      <div className="rounded-xl border border-border/50 bg-secondary/10 p-4">
+      <div className="rounded-xl border border-border/50 bg-secondary/10 p-4 space-y-3">
+        <span className="font-bold text-base">Reminder emails</span>
+        <label className="flex items-center gap-3 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={sendTwoDayReminder}
+            onChange={(e) => setSendTwoDayReminder(e.target.checked)}
+            className="h-4 w-4 accent-neon-pink"
+          />
+          <div>
+            <span className="text-sm font-bold">2 days before</span>
+            <p className="text-sm text-muted-foreground mt-0.5">
+              Email everyone on the lineup 2 days before the show.
+            </p>
+          </div>
+        </label>
         <label className="flex items-center gap-3 cursor-pointer">
           <input
             type="checkbox"
@@ -556,9 +666,9 @@ export function CreateMicForm() {
             className="h-4 w-4 accent-neon-pink"
           />
           <div>
-            <span className="font-bold text-base">Send 6-hour reminder emails</span>
+            <span className="text-sm font-bold">Day of show</span>
             <p className="text-sm text-muted-foreground mt-0.5">
-              Automatically email everyone on the lineup ~6 hours before showtime.
+              Email everyone on the lineup the day of the show at 7am EST / 4am PST.
             </p>
           </div>
         </label>
