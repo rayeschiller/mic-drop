@@ -394,6 +394,7 @@ export function MicPageClient({
     notes?: string
     totalSlots: number
     slug: string
+    imageUrl?: string | null
     seriesSlug?: string | null
     seriesName?: string | null
     sections?: SectionInput[]

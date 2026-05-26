@@ -191,7 +191,7 @@ export function CreateMicForm() {
           ...formData,
           date,
           slug: undefined, // auto-generate for each
-          hostEmail: undefined, // email already sent for the first date
+          hostEmail: "", // email already sent for the first date
           imageUrl: imageUrl || undefined,
           seriesSlug,
           seriesName,
