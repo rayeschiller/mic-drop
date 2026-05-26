@@ -74,7 +74,7 @@ interface EditMicModalProps {
   onOpenChange: (open: boolean) => void
   micData: MicEditData
   currentFilledSlots: number
-  onSave: (data: MicSaveData) => void
+  onSave: (data: MicSaveData) => Promise<void>
 }
 
 function sectionsToFormItems(sections: SectionData[]): SectionFormItem[] {
@@ -107,6 +107,7 @@ export function EditMicModal({
   const [recurringEndDate, setRecurringEndDate] = useState("")
   const [customDays, setCustomDays] = useState<number[]>([])
   const [applyToSeries, setApplyToSeries] = useState(true)
+  const [isSaving, setIsSaving] = useState(false)
 
   // modal={false} disables Radix's built-in scroll lock — do it manually
   useEffect(() => {
@@ -197,7 +198,7 @@ export function EditMicModal({
     setSectionItems((prev) => prev.filter((_, i) => i !== idx))
   }
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (slugStatus === "taken" || slugStatus === "invalid") return
     if (recurringFrequency === "custom" && recurringEndDate && customDays.length === 0) return
@@ -211,24 +212,29 @@ export function EditMicModal({
       : { placeId: null, formattedAddress: null, latitude: null, longitude: null }
 
     const { sections: _sections, ...rest } = formData
-    if (hasSections || sectionItems.length > 0) {
-      onSave({
-        ...rest,
-        ...locationData,
-        sections: sectionItems.map((s) => ({
-          id: s.id,
-          name: s.name || undefined,
-          startTime: s.startTime,
-          endTime: s.endTime || undefined,
-          slots: s.slots,
-        })),
-        ...recurringFields,
-        applyToSeries: !!formData.seriesSlug && applyToSeries,
-      })
-    } else {
-      onSave({ ...rest, ...locationData, ...recurringFields, applyToSeries: !!formData.seriesSlug && applyToSeries })
+    const saveData = (hasSections || sectionItems.length > 0)
+      ? {
+          ...rest,
+          ...locationData,
+          sections: sectionItems.map((s) => ({
+            id: s.id,
+            name: s.name || undefined,
+            startTime: s.startTime,
+            endTime: s.endTime || undefined,
+            slots: s.slots,
+          })),
+          ...recurringFields,
+          applyToSeries: !!formData.seriesSlug && applyToSeries,
+        }
+      : { ...rest, ...locationData, ...recurringFields, applyToSeries: !!formData.seriesSlug && applyToSeries }
+
+    setIsSaving(true)
+    try {
+      await onSave(saveData)
+      onOpenChange(false)
+    } finally {
+      setIsSaving(false)
     }
-    onOpenChange(false)
   }
 
   const minSlots = Math.max(1, currentFilledSlots)
@@ -664,16 +670,24 @@ export function EditMicModal({
               type="button"
               variant="outline"
               onClick={() => handleOpenChange(false)}
+              disabled={isSaving}
               className="flex-1 border-border bg-transparent"
             >
               Cancel
             </Button>
             <Button
               type="submit"
-              disabled={slugStatus === "taken" || slugStatus === "invalid"}
+              disabled={slugStatus === "taken" || slugStatus === "invalid" || isSaving}
               className="flex-1 bg-primary text-primary-foreground hover:bg-primary/90"
             >
-              Save Changes
+              {isSaving ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                  Saving…
+                </>
+              ) : (
+                "Save Changes"
+              )}
             </Button>
           </div>
         </form>
