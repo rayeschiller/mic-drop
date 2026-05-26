@@ -900,10 +900,26 @@ export async function hostUpdateSeriesMics(
     return { success: false, error: "Failed to update series" }
   }
 
-  // Update sections on every mic in the series if sections were provided
+  // Update sections on every mic in the series if sections were provided.
+  // Skip section restructuring for any mic that already has performers in its sections —
+  // deleting/recreating sections would orphan their slot records.
   if (data.sections && data.sections.length > 0) {
+    // Find which mics have taken slots in any section
+    const micIds = seriesMics.map((m) => m.id)
+    const { data: takenSlots } = await admin
+      .from("slots")
+      .select("mic_id")
+      .in("mic_id", micIds)
+      .eq("taken", true)
+      .not("section_id", "is", null)
+
+    const micsWithTakenSectionSlots = new Set((takenSlots || []).map((s) => s.mic_id as string))
+
     for (const mic of seriesMics) {
-      // Map sections without IDs so each mic gets its own section rows
+      if (micsWithTakenSectionSlots.has(mic.id)) {
+        // This date has performers — skip section restructuring, shared fields already updated above
+        continue
+      }
       const sectionsWithoutIds = data.sections.map(({ id: _id, ...s }) => s)
       await updateSections(admin, mic.id, sectionsWithoutIds)
     }
