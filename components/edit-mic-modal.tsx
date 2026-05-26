@@ -119,7 +119,7 @@ export function EditMicModal({
 
   const [place, setPlace] = useState<PlaceResult | null>(
     micData.placeId && micData.formattedAddress && micData.latitude != null && micData.longitude != null
-      ? { placeId: micData.placeId, formattedAddress: micData.formattedAddress, latitude: micData.latitude, longitude: micData.longitude }
+      ? { placeId: micData.placeId, name: null, formattedAddress: micData.formattedAddress, latitude: micData.latitude, longitude: micData.longitude }
       : null
   )
 
@@ -135,7 +135,7 @@ export function EditMicModal({
       setApplyToSeries(true)
       setPlace(
         micData.placeId && micData.formattedAddress && micData.latitude != null && micData.longitude != null
-          ? { placeId: micData.placeId, formattedAddress: micData.formattedAddress, latitude: micData.latitude, longitude: micData.longitude }
+          ? { placeId: micData.placeId, name: null, formattedAddress: micData.formattedAddress, latitude: micData.latitude, longitude: micData.longitude }
           : null
       )
     }
@@ -177,7 +177,7 @@ export function EditMicModal({
     setApplyToSeries(true)
     setPlace(
       micData.placeId && micData.formattedAddress && micData.latitude != null && micData.longitude != null
-        ? { placeId: micData.placeId, formattedAddress: micData.formattedAddress, latitude: micData.latitude, longitude: micData.longitude }
+        ? { placeId: micData.placeId, name: null, formattedAddress: micData.formattedAddress, latitude: micData.latitude, longitude: micData.longitude }
         : null
     )
   }, [micData]) // eslint-disable-line react-hooks/exhaustive-deps
@@ -356,7 +356,14 @@ export function EditMicModal({
 
           <div className="space-y-2">
             <Label className="text-foreground font-medium">Location</Label>
-            <PlaceAutocomplete value={place} onChange={setPlace} size="sm" />
+            <PlaceAutocomplete
+              value={place}
+              onChange={(p) => {
+                setPlace(p)
+                if (p?.name) setFormData((prev) => ({ ...prev, venue: p.name! }))
+              }}
+              size="sm"
+            />
             {place && (
               <p className="text-xs text-neon-green flex items-center gap-1">
                 <span>✓</span> Location set — mic will appear in nearby searches

@@ -6,6 +6,7 @@ import { MapPin, X } from 'lucide-react'
 
 export interface PlaceResult {
   placeId: string
+  name: string | null
   formattedAddress: string
   latitude: number
   longitude: number
@@ -27,7 +28,7 @@ export function PlaceAutocomplete({ value, onChange, size = "default" }: PlaceAu
     if (!placesLib || !inputRef.current) return
 
     const ac = new placesLib.Autocomplete(inputRef.current, {
-      fields: ['place_id', 'formatted_address', 'geometry'],
+      fields: ['place_id', 'name', 'formatted_address', 'geometry'],
     })
     autocompleteRef.current = ac
 
@@ -36,6 +37,7 @@ export function PlaceAutocomplete({ value, onChange, size = "default" }: PlaceAu
       if (!place.place_id || !place.geometry?.location) return
       const result: PlaceResult = {
         placeId: place.place_id,
+        name: place.name ?? null,
         formattedAddress: place.formatted_address ?? inputRef.current?.value ?? '',
         latitude: place.geometry.location.lat(),
         longitude: place.geometry.location.lng(),

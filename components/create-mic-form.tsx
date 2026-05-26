@@ -383,7 +383,13 @@ export function CreateMicForm() {
 
       <div className="space-y-2">
         <Label className="text-lg font-bold">Venue Location</Label>
-        <PlaceAutocomplete value={place} onChange={setPlace} />
+        <PlaceAutocomplete
+          value={place}
+          onChange={(p) => {
+            setPlace(p)
+            if (p?.name) setFormData((prev) => ({ ...prev, venue: p.name! }))
+          }}
+        />
         <p className="text-sm text-muted-foreground">
           Optional — shows your mic on the map so comedians can find mics near them.
         </p>
