@@ -401,6 +401,10 @@ export function MicPageClient({
     signupOpensAt?: string | null
     sendReminders?: boolean
     sendTwoDayReminder?: boolean
+    placeId?: string | null
+    formattedAddress?: string | null
+    latitude?: number | null
+    longitude?: number | null
     recurringFrequency?: RecurringFrequency
     recurringEndDate?: string
     customDays?: number[]
@@ -427,6 +431,14 @@ export function MicPageClient({
 
     if (!result.success) return
 
+    // Location from the form (user may have updated it)
+    const locationData = {
+      placeId: data.placeId ?? null,
+      formattedAddress: data.formattedAddress ?? null,
+      latitude: data.latitude ?? null,
+      longitude: data.longitude ?? null,
+    }
+
     // Bulk-update all other dates in the series with shared fields
     if (applyToSeries && newSeriesSlug) {
       await hostUpdateSeriesMics(slug, hostPin, newSeriesSlug, {
@@ -441,10 +453,7 @@ export function MicPageClient({
         sendReminders: data.sendReminders,
         sendTwoDayReminder: data.sendTwoDayReminder,
         timezone,
-        placeId: mic?.placeId ?? null,
-        formattedAddress: mic?.formattedAddress ?? null,
-        latitude: mic?.latitude ?? null,
-        longitude: mic?.longitude ?? null,
+        ...locationData,
       })
     }
 
@@ -471,12 +480,8 @@ export function MicPageClient({
           sendReminders: data.sendReminders,
           sendTwoDayReminder: data.sendTwoDayReminder,
           timezone,
-          // Carry forward location and image from the original mic
-          imageUrl: mic?.imageUrl ?? undefined,
-          placeId: mic?.placeId ?? null,
-          formattedAddress: mic?.formattedAddress ?? null,
-          latitude: mic?.latitude ?? null,
-          longitude: mic?.longitude ?? null,
+          imageUrl: data.imageUrl ?? undefined,
+          ...locationData,
         })
       }
     }
@@ -966,6 +971,10 @@ export function MicPageClient({
             signupOpensAt: mic.signupOpensAt,
             sendReminders: mic.sendReminders,
             sendTwoDayReminder: mic.sendTwoDayReminder,
+            placeId: mic.placeId,
+            formattedAddress: mic.formattedAddress,
+            latitude: mic.latitude,
+            longitude: mic.longitude,
           }}
           currentFilledSlots={filledSlots}
           onSave={handleEditSave}

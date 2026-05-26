@@ -17,6 +17,7 @@ import { checkSlugAvailability, type SectionData, type SectionInput } from "@/ap
 import { ImageUpload } from "@/components/image-upload"
 import { SignupReleasePicker } from "@/components/signup-release-picker"
 import { type RecurringFrequency, DAY_LABELS, calcRecurringDates } from "@/lib/recurring"
+import { PlaceAutocomplete, type PlaceResult } from "@/components/place-autocomplete"
 
 function toSlug(value: string): string {
   return value
@@ -54,6 +55,10 @@ interface MicEditData {
   signupOpensAt?: string | null
   sendReminders?: boolean
   sendTwoDayReminder?: boolean
+  placeId?: string | null
+  formattedAddress?: string | null
+  latitude?: number | null
+  longitude?: number | null
 }
 
 type MicSaveData = Omit<MicEditData, "sections"> & {
@@ -102,6 +107,11 @@ export function EditMicModal({
   const [recurringEndDate, setRecurringEndDate] = useState("")
   const [customDays, setCustomDays] = useState<number[]>([])
   const [applyToSeries, setApplyToSeries] = useState(true)
+  const [place, setPlace] = useState<PlaceResult | null>(
+    micData.placeId && micData.formattedAddress && micData.latitude != null && micData.longitude != null
+      ? { placeId: micData.placeId, formattedAddress: micData.formattedAddress, latitude: micData.latitude, longitude: micData.longitude }
+      : null
+  )
 
   const handleOpenChange = (newOpen: boolean) => {
     if (newOpen) {
@@ -113,6 +123,11 @@ export function EditMicModal({
       setRecurringEndDate("")
       setCustomDays([])
       setApplyToSeries(true)
+      setPlace(
+        micData.placeId && micData.formattedAddress && micData.latitude != null && micData.longitude != null
+          ? { placeId: micData.placeId, formattedAddress: micData.formattedAddress, latitude: micData.latitude, longitude: micData.longitude }
+          : null
+      )
     }
     onOpenChange(newOpen)
   }
@@ -150,6 +165,11 @@ export function EditMicModal({
     setRecurringEndDate("")
     setCustomDays([])
     setApplyToSeries(true)
+    setPlace(
+      micData.placeId && micData.formattedAddress && micData.latitude != null && micData.longitude != null
+        ? { placeId: micData.placeId, formattedAddress: micData.formattedAddress, latitude: micData.latitude, longitude: micData.longitude }
+        : null
+    )
   }, [micData]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const updateSectionItem = (idx: number, update: Partial<SectionFormItem>) => {
@@ -177,10 +197,15 @@ export function EditMicModal({
       ? { recurringFrequency, recurringEndDate, customDays }
       : {}
 
+    const locationData = place
+      ? { placeId: place.placeId, formattedAddress: place.formattedAddress, latitude: place.latitude, longitude: place.longitude }
+      : { placeId: null, formattedAddress: null, latitude: null, longitude: null }
+
     const { sections: _sections, ...rest } = formData
     if (hasSections || sectionItems.length > 0) {
       onSave({
         ...rest,
+        ...locationData,
         sections: sectionItems.map((s) => ({
           id: s.id,
           name: s.name || undefined,
@@ -192,7 +217,7 @@ export function EditMicModal({
         applyToSeries: !!formData.seriesSlug && applyToSeries,
       })
     } else {
-      onSave({ ...rest, ...recurringFields, applyToSeries: !!formData.seriesSlug && applyToSeries })
+      onSave({ ...rest, ...locationData, ...recurringFields, applyToSeries: !!formData.seriesSlug && applyToSeries })
     }
     onOpenChange(false)
   }
@@ -304,6 +329,21 @@ export function EditMicModal({
               required
               className="border-border bg-secondary/50 focus:border-primary"
             />
+          </div>
+
+          <div className="space-y-2">
+            <Label className="text-foreground font-medium">Location</Label>
+            <PlaceAutocomplete value={place} onChange={setPlace} />
+            {place && (
+              <p className="text-xs text-neon-green flex items-center gap-1">
+                <span>✓</span> Location set — mic will appear in nearby searches
+              </p>
+            )}
+            {!place && (
+              <p className="text-xs text-muted-foreground">
+                Search for the venue address to show up in &quot;Mics Near You&quot; and on maps.
+              </p>
+            )}
           </div>
 
           <div className="space-y-2">
