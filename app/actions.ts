@@ -740,6 +740,10 @@ export async function hostUpdateMic(
     sendReminders?: boolean
     sendTwoDayReminder?: boolean
     timezone?: string  // optional — if host re-saves from a different zone
+    placeId?: string | null
+    formattedAddress?: string | null
+    latitude?: number | null
+    longitude?: number | null
   }
 ): Promise<{ success: boolean; newSlug?: string; error?: string }> {
   const verified = await verifyHostPin(micSlug, pin)
@@ -786,6 +790,10 @@ export async function hostUpdateMic(
       send_reminders: data.sendReminders !== undefined ? data.sendReminders : undefined,
       send_two_day_reminder: data.sendTwoDayReminder !== undefined ? data.sendTwoDayReminder : undefined,
       timezone: data.timezone !== undefined ? data.timezone : undefined,
+      place_id: data.placeId !== undefined ? data.placeId : undefined,
+      formatted_address: data.formattedAddress !== undefined ? data.formattedAddress : undefined,
+      latitude: data.latitude !== undefined ? data.latitude : undefined,
+      longitude: data.longitude !== undefined ? data.longitude : undefined,
     })
     .eq("id", mic.id)
 
