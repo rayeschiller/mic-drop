@@ -226,7 +226,15 @@ export function EditMicModal({
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent className="bg-card border-border sm:max-w-3xl max-h-[90vh] overflow-y-auto">
+      <DialogContent
+          className="bg-card border-border sm:max-w-3xl max-h-[90vh] overflow-y-auto"
+          onPointerDownOutside={(e) => {
+            if ((e.target as Element)?.closest?.(".pac-container")) e.preventDefault()
+          }}
+          onInteractOutside={(e) => {
+            if ((e.target as Element)?.closest?.(".pac-container")) e.preventDefault()
+          }}
+        >
         <DialogHeader>
           <DialogTitle className="text-foreground flex items-center gap-2">
             <Pencil className="h-5 w-5 text-primary" />
