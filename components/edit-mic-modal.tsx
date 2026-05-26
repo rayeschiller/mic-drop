@@ -234,16 +234,16 @@ export function EditMicModal({
   const minSlots = Math.max(1, currentFilledSlots)
 
   return (
-    <>
-    {/* Backdrop — sits behind the dialog but captures outside clicks to close */}
-    {open && (
-      <div
-        className="fixed inset-0 z-40 bg-black/50"
-        onClick={() => handleOpenChange(false)}
-      />
-    )}
     <Dialog open={open} onOpenChange={handleOpenChange} modal={false}>
-      <DialogContent className="bg-card border-border sm:max-w-3xl max-h-[90vh] overflow-y-auto" showOverlay={false}>
+      <DialogContent
+        className="bg-card border-border sm:max-w-3xl max-h-[90vh] overflow-y-auto"
+        onPointerDownOutside={(e) => {
+          if ((e.target as Element)?.closest?.(".pac-container")) e.preventDefault()
+        }}
+        onInteractOutside={(e) => {
+          if ((e.target as Element)?.closest?.(".pac-container")) e.preventDefault()
+        }}
+      >
         <DialogHeader>
           <DialogTitle className="text-foreground flex items-center gap-2">
             <Pencil className="h-5 w-5 text-primary" />
@@ -679,6 +679,5 @@ export function EditMicModal({
         </form>
       </DialogContent>
     </Dialog>
-    </>
   )
 }
