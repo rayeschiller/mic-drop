@@ -107,6 +107,15 @@ export function EditMicModal({
   const [recurringEndDate, setRecurringEndDate] = useState("")
   const [customDays, setCustomDays] = useState<number[]>([])
   const [applyToSeries, setApplyToSeries] = useState(true)
+
+  // modal={false} disables Radix's built-in scroll lock — do it manually
+  useEffect(() => {
+    if (!open) return
+    const prev = document.body.style.overflow
+    document.body.style.overflow = "hidden"
+    return () => { document.body.style.overflow = prev }
+  }, [open])
+
   const [place, setPlace] = useState<PlaceResult | null>(
     micData.placeId && micData.formattedAddress && micData.latitude != null && micData.longitude != null
       ? { placeId: micData.placeId, formattedAddress: micData.formattedAddress, latitude: micData.latitude, longitude: micData.longitude }
@@ -225,16 +234,16 @@ export function EditMicModal({
   const minSlots = Math.max(1, currentFilledSlots)
 
   return (
-    <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent
-          className="bg-card border-border sm:max-w-3xl max-h-[90vh] overflow-y-auto"
-          onPointerDownOutside={(e) => {
-            if ((e.target as Element)?.closest?.(".pac-container")) e.preventDefault()
-          }}
-          onInteractOutside={(e) => {
-            if ((e.target as Element)?.closest?.(".pac-container")) e.preventDefault()
-          }}
-        >
+    <>
+    {/* Backdrop — sits behind the dialog but captures outside clicks to close */}
+    {open && (
+      <div
+        className="fixed inset-0 z-40 bg-black/50"
+        onClick={() => handleOpenChange(false)}
+      />
+    )}
+    <Dialog open={open} onOpenChange={handleOpenChange} modal={false}>
+      <DialogContent className="bg-card border-border sm:max-w-3xl max-h-[90vh] overflow-y-auto" showOverlay={false}>
         <DialogHeader>
           <DialogTitle className="text-foreground flex items-center gap-2">
             <Pencil className="h-5 w-5 text-primary" />
@@ -670,5 +679,6 @@ export function EditMicModal({
         </form>
       </DialogContent>
     </Dialog>
+    </>
   )
 }
