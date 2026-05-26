@@ -333,7 +333,7 @@ export function EditMicModal({
 
           <div className="space-y-2">
             <Label className="text-foreground font-medium">Location</Label>
-            <PlaceAutocomplete value={place} onChange={setPlace} />
+            <PlaceAutocomplete value={place} onChange={setPlace} size="sm" />
             {place && (
               <p className="text-xs text-neon-green flex items-center gap-1">
                 <span>✓</span> Location set — mic will appear in nearby searches

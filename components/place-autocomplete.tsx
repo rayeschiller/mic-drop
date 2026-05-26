@@ -14,9 +14,10 @@ export interface PlaceResult {
 interface PlaceAutocompleteProps {
   value: PlaceResult | null
   onChange: (place: PlaceResult | null) => void
+  size?: "default" | "sm"
 }
 
-export function PlaceAutocomplete({ value, onChange }: PlaceAutocompleteProps) {
+export function PlaceAutocomplete({ value, onChange, size = "default" }: PlaceAutocompleteProps) {
   const inputRef = useRef<HTMLInputElement>(null)
   const [inputValue, setInputValue] = useState(value?.formattedAddress ?? '')
   const placesLib = useMapsLibrary('places')
@@ -67,7 +68,11 @@ export function PlaceAutocomplete({ value, onChange }: PlaceAutocompleteProps) {
           if (!e.target.value) onChange(null)
         }}
         placeholder='e.g. "The Laugh Factory, Los Angeles, CA"'
-        className="w-full h-12 pl-10 pr-10 text-lg rounded-md border border-border bg-secondary/50 focus:border-neon-pink focus:outline-none placeholder:text-muted-foreground/50"
+        className={`w-full pl-10 pr-10 rounded-md border border-border bg-secondary/50 focus:border-neon-pink focus:outline-none placeholder:text-muted-foreground/50 ${
+          size === "sm"
+            ? "h-10 text-sm"
+            : "h-12 text-lg"
+        }`}
       />
       {value && (
         <button
