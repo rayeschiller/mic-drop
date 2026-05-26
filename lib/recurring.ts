@@ -12,7 +12,8 @@ export function calcRecurringDates(
   const end = new Date(endDate + "T00:00:00")
   const start = new Date(startDate + "T00:00:00")
 
-  if (frequency === "custom" && customDays && customDays.length > 0) {
+  if (frequency === "custom") {
+    if (!customDays || customDays.length === 0) return dates
     const current = new Date(start)
     current.setDate(current.getDate() + 1)
     while (current <= end) {
@@ -26,7 +27,11 @@ export function calcRecurringDates(
   }
 
   let current = new Date(start)
-  current.setDate(current.getDate() + (frequency === "weekly" ? 7 : frequency === "biweekly" ? 14 : 0))
+  if (frequency === "monthly") {
+    current.setMonth(current.getMonth() + 1)
+  } else {
+    current.setDate(current.getDate() + (frequency === "weekly" ? 7 : 14))
+  }
 
   while (current <= end) {
     dates.push(current.toISOString().split("T")[0])
