@@ -638,6 +638,7 @@ export function EditMicModal({
           <SignupReleasePicker
             value={formData.signupOpensAt ?? null}
             onChange={(val) => setFormData((prev) => ({ ...prev, signupOpensAt: val }))}
+            micDate={formData.date}
           />
 
           <div className="rounded-lg border border-border/50 bg-secondary/10 p-3 space-y-3">

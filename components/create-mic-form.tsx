@@ -646,6 +646,7 @@ export function CreateMicForm() {
       <SignupReleasePicker
         value={signupOpensAt}
         onChange={setSignupOpensAt}
+        micDate={formData.date || undefined}
       />
 
       <div className="rounded-xl border border-border/50 bg-secondary/10 p-4 space-y-3">

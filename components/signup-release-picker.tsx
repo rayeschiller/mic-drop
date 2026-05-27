@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { Label } from "@/components/ui/label"
 import { Input } from "@/components/ui/input"
 import { Clock } from "lucide-react"
@@ -66,43 +66,75 @@ export function utcToLocalDateTime(utcISO: string, tz: string): { date: string; 
 interface SignupReleasePickerProps {
   value: string | null // UTC ISO string
   onChange: (utcISO: string | null) => void
+  /** The mic's date (YYYY-MM-DD). Release time must be before this day. */
+  micDate?: string
 }
 
-export function SignupReleasePicker({ value, onChange }: SignupReleasePickerProps) {
+export function SignupReleasePicker({ value, onChange, micDate }: SignupReleasePickerProps) {
   const [enabled, setEnabled] = useState(!!value)
   const [tz, setTz] = useState<string>(getBrowserTimezone)
   const [date, setDate] = useState("")
   const [time, setTime] = useState("19:00")
-  const [initialized, setInitialized] = useState(false)
   const [pastError, setPastError] = useState(false)
+  const [afterMicError, setAfterMicError] = useState(false)
+
+  // Track the last value we initialized from so we can re-sync when it changes
+  // (e.g. edit modal opened for a different mic in the same series)
+  const lastSyncedValue = useRef<string | null | undefined>(undefined)
 
   useEffect(() => {
-    if (initialized) return
-    setInitialized(true)
+    if (value === lastSyncedValue.current) return
+    lastSyncedValue.current = value
+
     const browserTz = getBrowserTimezone()
     setTz(browserTz)
+    setPastError(false)
+    setAfterMicError(false)
+
     if (value) {
       setEnabled(true)
       const local = utcToLocalDateTime(value, browserTz)
       setDate(local.date)
       setTime(local.time)
+    } else {
+      setEnabled(false)
+      setDate("")
+      setTime("19:00")
     }
-  }, [value, initialized])
+  }, [value])
 
   const emit = (d: string, t: string, z: string) => {
     if (!d || !t) return
     const utc = localDateTimeToUTC(d, t, z)
-    if (new Date(utc) <= new Date()) {
+    const releaseDate = new Date(utc)
+
+    if (releaseDate <= new Date()) {
       setPastError(true)
+      setAfterMicError(false)
       onChange(null)
-    } else {
-      setPastError(false)
-      onChange(utc)
+      return
     }
+
+    // Release time must be strictly before the mic date
+    if (micDate) {
+      const micStart = new Date(`${micDate}T00:00:00`)
+      if (releaseDate >= micStart) {
+        setAfterMicError(true)
+        setPastError(false)
+        onChange(null)
+        return
+      }
+    }
+
+    setPastError(false)
+    setAfterMicError(false)
+    onChange(utc)
   }
 
   const handleToggle = (checked: boolean) => {
     setEnabled(checked)
+    setPastError(false)
+    setAfterMicError(false)
     if (!checked) {
       onChange(null)
     } else if (date && time) {
@@ -142,6 +174,7 @@ export function SignupReleasePicker({ value, onChange }: SignupReleasePickerProp
             <Input
               type="date"
               value={date}
+              max={micDate}
               onChange={(e) => { setDate(e.target.value); emit(e.target.value, time, tz) }}
               className="h-10 border-border bg-secondary/50 focus:border-neon-pink"
             />
@@ -170,6 +203,9 @@ export function SignupReleasePicker({ value, onChange }: SignupReleasePickerProp
         </div>
         {pastError && (
           <p className="text-sm text-destructive">Release time must be in the future.</p>
+        )}
+        {afterMicError && (
+          <p className="text-sm text-destructive">Release time must be before the mic date.</p>
         )}
         </div>
       )}
