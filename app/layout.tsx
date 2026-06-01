@@ -75,7 +75,15 @@ export default function RootLayout({
                 </a>{" "}
                 if it saved you time or made your night a little smoother. ☕
               </p>
-              <ThemeToggle />
+              <div className="flex items-center gap-4">
+                <a
+                  href="mailto:help@micdrop.site"
+                  className="hover:text-foreground transition-colors"
+                >
+                  help@micdrop.site
+                </a>
+                <ThemeToggle />
+              </div>
             </div>
           </footer>
           <Analytics />
