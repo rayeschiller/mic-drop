@@ -671,7 +671,7 @@ export function MicPageClient({
           )}
 
           {/* Main content column */}
-          <div className="min-w-0">
+          <div className="min-w-0 w-full">
             {/* Mic Header */}
             <div className="relative overflow-hidden rounded-2xl border-2 border-primary bg-card mb-8">
               <div className="relative p-8 md:p-12">
@@ -1042,7 +1042,7 @@ function DatePillScroller({
   ].sort((a, b) => a.date.localeCompare(b.date))
 
   return (
-    <div className="relative mb-8 w-full min-w-0">
+    <div className="relative mb-8 w-full min-w-0 overflow-hidden">
       {/* Left fade + arrow */}
       {canScrollLeft && (
         <>
