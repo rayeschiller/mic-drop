@@ -2,6 +2,8 @@
 
 import { createAdminClient } from "@/lib/supabase/admin"
 import { createClient } from "@/lib/supabase/server"
+import { put } from "@vercel/blob"
+import { unstable_cache } from "next/cache"
 import {
   sendHostPinEmail,
   sendNewSignupNotificationEmail,
@@ -99,22 +101,19 @@ export interface SectionInput {
 // --- Actions ---
 
 export async function uploadMicImage(formData: FormData): Promise<{ url?: string; error?: string }> {
-  const admin = createAdminClient()
   const file = formData.get("file") as File
   if (!file) return { error: "No file provided" }
 
   const ext = file.name.split(".").pop()
-  const path = `${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`
-  const buffer = new Uint8Array(await file.arrayBuffer())
+  const filename = `mic-images/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`
 
-  const { error } = await admin.storage
-    .from("mic_image")
-    .upload(path, buffer, { contentType: file.type, upsert: false })
-
-  if (error) return { error: error.message }
-
-  const { data } = admin.storage.from("mic_image").getPublicUrl(path)
-  return { url: data.publicUrl }
+  try {
+    const blob = await put(filename, file, { access: "public" })
+    return { url: blob.url }
+  } catch (err) {
+    console.error("Failed to upload image to Vercel Blob:", err)
+    return { error: "Failed to upload image" }
+  }
 }
 
 export async function checkSlugAvailability(slug: string): Promise<{ available: boolean }> {
@@ -374,8 +373,8 @@ export interface MicLocationData {
   moreDatesCount: number
 }
 
-export async function getUpcomingMicsWithLocation(): Promise<MicLocationData[]> {
-  const supabase = await createClient()
+async function _getUpcomingMicsWithLocation(): Promise<MicLocationData[]> {
+  const supabase = createAdminClient()
   const today = new Date().toISOString().split("T")[0]
 
   const { data: mics } = await supabase
@@ -441,6 +440,13 @@ export async function getUpcomingMicsWithLocation(): Promise<MicLocationData[]> 
     moreDatesCount: m.series_slug ? (seriesCount[m.series_slug] || 1) - 1 : 0,
   }))
 }
+
+// Cached version — revalidates every 5 minutes so homepage hits Next.js cache, not Supabase
+export const getUpcomingMicsWithLocation = unstable_cache(
+  _getUpcomingMicsWithLocation,
+  ["upcoming-mics-with-location"],
+  { revalidate: 300 }
+)
 
 export async function signupForSlot(
   micSlug: string,
