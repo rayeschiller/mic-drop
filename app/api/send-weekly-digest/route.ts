@@ -41,7 +41,7 @@ export async function GET(request: Request) {
     .from("slots")
     .select("id", { count: "exact", head: true })
     .eq("taken", true)
-    .gte("updated_at", oneWeekAgo)
+    .gte("signed_up_at", oneWeekAgo)
 
   // Performers with email
   const { count: totalWithEmail } = await admin

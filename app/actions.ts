@@ -472,6 +472,7 @@ export async function signupForSlot(
       performer_name: name,
       performer_instagram: instagram || null,
       performer_email: email || null,
+      signed_up_at: new Date().toISOString(),
     })
     .eq("mic_id", mic.id)
     .eq("slot_number", slotNumber)
@@ -553,6 +554,7 @@ async function promoteOrClearSlot(
         performer_name: firstWaiting.performer_name,
         performer_instagram: firstWaiting.performer_instagram,
         performer_email: firstWaiting.performer_email,
+        signed_up_at: new Date().toISOString(),
       })
       .eq("id", slotId)
 
