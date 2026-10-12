@@ -83,7 +83,7 @@ export function ImageUpload({ value, onChange }: ImageUploadProps) {
         <input
           ref={inputRef}
           type="file"
-          accept="image/*"
+          accept="image/jpeg,image/png,image/webp,image/gif"
           className="hidden"
           onChange={(e) => {
             const file = e.target.files?.[0]

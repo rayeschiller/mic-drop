@@ -8,6 +8,17 @@ function micLink(micSlug: string): string {
   return `${SITE_URL}/${micSlug}`
 }
 
+// User-supplied values (mic names, venues, performer names) are interpolated into
+// email HTML, so they must be escaped to prevent HTML injection / phishing content.
+function escapeHtml(value: string | null | undefined): string {
+  return String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;")
+}
+
 function formatTime(timeString: string): string {
   const [hours, minutes] = timeString.split(":")
   const hour = parseInt(hours)
@@ -98,16 +109,16 @@ export async function sendPerformerReminderEmails({
             </h1>
             <p style="color: #aaa; margin: 0 0 32px;">Reminder — your mic is ${timeLabel}.</p>
 
-            <h2 style="font-size: 22px; font-weight: 700; margin: 0 0 16px;">${micName}</h2>
+            <h2 style="font-size: 22px; font-weight: 700; margin: 0 0 16px;">${escapeHtml(micName)}</h2>
 
             <div style="display: flex; flex-direction: column; gap: 8px; margin: 0 0 24px;">
-              <p style="margin: 0; font-size: 15px;">📍 ${venue}</p>
+              <p style="margin: 0; font-size: 15px;">📍 ${escapeHtml(venue)}</p>
               <p style="margin: 0; font-size: 15px;">📅 ${dateFormatted}</p>
               <p style="margin: 0; font-size: 15px;">🕐 ${timeFormatted}</p>
             </div>
 
             <p style="font-size: 16px; color: #f8f8f8; margin: 0 0 24px;">
-              Hey ${name} — you're on the list. See you at ${timeFormatted}!
+              Hey ${escapeHtml(name)} — you're on the list. See you at ${timeFormatted}!
             </p>
 
             <a href="${micUrl}" style="display: inline-block; padding: 12px 24px; background: #e879a0; color: #fff; text-decoration: none; border-radius: 8px; font-weight: 700; font-size: 15px;">
@@ -154,16 +165,16 @@ export async function sendTwoDayReminderEmails({
             </h1>
             <p style="color: #aaa; margin: 0 0 32px;">Reminder — your mic is in 2 days.</p>
 
-            <h2 style="font-size: 22px; font-weight: 700; margin: 0 0 16px;">${micName}</h2>
+            <h2 style="font-size: 22px; font-weight: 700; margin: 0 0 16px;">${escapeHtml(micName)}</h2>
 
             <div style="display: flex; flex-direction: column; gap: 8px; margin: 0 0 24px;">
-              <p style="margin: 0; font-size: 15px;">📍 ${venue}</p>
+              <p style="margin: 0; font-size: 15px;">📍 ${escapeHtml(venue)}</p>
               <p style="margin: 0; font-size: 15px;">📅 ${dateFormatted}</p>
               <p style="margin: 0; font-size: 15px;">🕐 ${timeFormatted}</p>
             </div>
 
             <p style="font-size: 16px; color: #f8f8f8; margin: 0 0 24px;">
-              Hey ${name} — you're on the list. Two days out. Get your set together.
+              Hey ${escapeHtml(name)} — you're on the list. Two days out. Get your set together.
             </p>
 
             <a href="${micUrl}" style="display: inline-block; padding: 12px 24px; background: #e879a0; color: #fff; text-decoration: none; border-radius: 8px; font-weight: 700; font-size: 15px;">
@@ -210,16 +221,16 @@ export async function sendWeekReminderEmails({
             </h1>
             <p style="color: #aaa; margin: 0 0 32px;">Reminder — your mic is in 1 week.</p>
 
-            <h2 style="font-size: 22px; font-weight: 700; margin: 0 0 16px;">${micName}</h2>
+            <h2 style="font-size: 22px; font-weight: 700; margin: 0 0 16px;">${escapeHtml(micName)}</h2>
 
             <div style="display: flex; flex-direction: column; gap: 8px; margin: 0 0 24px;">
-              <p style="margin: 0; font-size: 15px;">📍 ${venue}</p>
+              <p style="margin: 0; font-size: 15px;">📍 ${escapeHtml(venue)}</p>
               <p style="margin: 0; font-size: 15px;">📅 ${dateFormatted}</p>
               <p style="margin: 0; font-size: 15px;">🕐 ${timeFormatted}</p>
             </div>
 
             <p style="font-size: 16px; color: #f8f8f8; margin: 0 0 24px;">
-              Hey ${name} — you're on the list. Start writing.
+              Hey ${escapeHtml(name)} — you're on the list. Start writing.
             </p>
 
             <a href="${micUrl}" style="display: inline-block; padding: 12px 24px; background: #e879a0; color: #fff; text-decoration: none; border-radius: 8px; font-weight: 700; font-size: 15px;">
@@ -269,10 +280,10 @@ export async function sendWaitlistConfirmationEmail({
         </h1>
         <p style="color: #aaa; margin: 0 0 32px;">You're on the waitlist.</p>
 
-        <h2 style="font-size: 20px; font-weight: 700; margin: 0 0 16px;">${micName}</h2>
+        <h2 style="font-size: 20px; font-weight: 700; margin: 0 0 16px;">${escapeHtml(micName)}</h2>
 
         <div style="display: flex; flex-direction: column; gap: 8px; margin: 0 0 24px;">
-          <p style="margin: 0; font-size: 15px;">📍 ${venue}</p>
+          <p style="margin: 0; font-size: 15px;">📍 ${escapeHtml(venue)}</p>
           <p style="margin: 0; font-size: 15px;">📅 ${dateFormatted}</p>
           <p style="margin: 0; font-size: 15px;">🕐 ${timeFormatted}</p>
         </div>
@@ -283,7 +294,7 @@ export async function sendWaitlistConfirmationEmail({
         </div>
 
         <p style="font-size: 16px; color: #f8f8f8; margin: 0 0 24px;">
-          Hey ${performerName} — we'll email you if a slot opens up. Keep your fingers crossed.
+          Hey ${escapeHtml(performerName)} — we'll email you if a slot opens up. Keep your fingers crossed.
         </p>
 
         <a href="${micUrl}" style="display: inline-block; padding: 12px 24px; background: #e879a0; color: #fff; text-decoration: none; border-radius: 8px; font-weight: 700; font-size: 15px;">
@@ -330,16 +341,16 @@ export async function sendWaitlistPromotionEmail({
         </h1>
         <p style="color: #aaa; margin: 0 0 32px;">The list came through for you.</p>
 
-        <h2 style="font-size: 20px; font-weight: 700; margin: 0 0 16px;">${micName}</h2>
+        <h2 style="font-size: 20px; font-weight: 700; margin: 0 0 16px;">${escapeHtml(micName)}</h2>
 
         <div style="display: flex; flex-direction: column; gap: 8px; margin: 0 0 24px;">
-          <p style="margin: 0; font-size: 15px;">📍 ${venue}</p>
+          <p style="margin: 0; font-size: 15px;">📍 ${escapeHtml(venue)}</p>
           <p style="margin: 0; font-size: 15px;">📅 ${dateFormatted}</p>
           <p style="margin: 0; font-size: 15px;">🕐 ${timeFormatted}</p>
         </div>
 
         <p style="font-size: 18px; font-weight: 700; color: #f8f8f8; margin: 0 0 8px;">
-          Hey ${performerName} — you got a slot.
+          Hey ${escapeHtml(performerName)} — you got a slot.
         </p>
         <p style="font-size: 15px; color: #aaa; margin: 0 0 24px;">
           Someone dropped out and you're next in line. You're now on the lineup.
@@ -390,10 +401,10 @@ export async function sendWaitlistReminderEmails({
             </h1>
             <p style="color: #aaa; margin: 0 0 32px;">Reminder — your mic is in ${timeLabel}. You're still on the waitlist.</p>
 
-            <h2 style="font-size: 22px; font-weight: 700; margin: 0 0 16px;">${micName}</h2>
+            <h2 style="font-size: 22px; font-weight: 700; margin: 0 0 16px;">${escapeHtml(micName)}</h2>
 
             <div style="display: flex; flex-direction: column; gap: 8px; margin: 0 0 24px;">
-              <p style="margin: 0; font-size: 15px;">📍 ${venue}</p>
+              <p style="margin: 0; font-size: 15px;">📍 ${escapeHtml(venue)}</p>
               <p style="margin: 0; font-size: 15px;">📅 ${dateFormatted}</p>
               <p style="margin: 0; font-size: 15px;">🕐 ${timeFormatted}</p>
             </div>
@@ -404,7 +415,7 @@ export async function sendWaitlistReminderEmails({
             </div>
 
             <p style="font-size: 16px; color: #f8f8f8; margin: 0 0 24px;">
-              Hey ${name} — spots sometimes open up last minute. Keep an eye on your inbox.
+              Hey ${escapeHtml(name)} — spots sometimes open up last minute. Keep an eye on your inbox.
             </p>
 
             <a href="${micUrl}" style="display: inline-block; padding: 12px 24px; background: #e879a0; color: #fff; text-decoration: none; border-radius: 8px; font-weight: 700; font-size: 15px;">
@@ -454,8 +465,8 @@ export async function sendWeeklyDigestEmail({
           return `
             <tr>
               <td style="padding: 12px 0; border-bottom: 1px solid #222;">
-                <a href="${siteUrl}/${mic.slug}" style="color: #e879a0; font-weight: 700; text-decoration: none; font-size: 15px;">${mic.name}</a>
-                <div style="color: #aaa; font-size: 13px; margin-top: 2px;">${mic.venue} &middot; ${formatDate(mic.date)} &middot; ${formatTime(mic.startTime)}</div>
+                <a href="${siteUrl}/${escapeHtml(mic.slug)}" style="color: #e879a0; font-weight: 700; text-decoration: none; font-size: 15px;">${escapeHtml(mic.name)}</a>
+                <div style="color: #aaa; font-size: 13px; margin-top: 2px;">${escapeHtml(mic.venue)} &middot; ${formatDate(mic.date)} &middot; ${formatTime(mic.startTime)}</div>
                 <div style="font-family: monospace; font-size: 12px; margin-top: 6px; color: #e879a0;">${bar} ${mic.slotsTaken}/${mic.totalSlots} slots (${fillPct}%)</div>
               </td>
             </tr>`
@@ -566,10 +577,10 @@ export async function sendSignupConfirmationEmail({
         </h1>
         <p style="color: #aaa; margin: 0 0 32px;">You're on the list.</p>
 
-        <h2 style="font-size: 20px; font-weight: 700; margin: 0 0 16px;">${micName}</h2>
+        <h2 style="font-size: 20px; font-weight: 700; margin: 0 0 16px;">${escapeHtml(micName)}</h2>
 
         <div style="display: flex; flex-direction: column; gap: 8px; margin: 0 0 24px;">
-          <p style="margin: 0; font-size: 15px;">📍 ${venue}</p>
+          <p style="margin: 0; font-size: 15px;">📍 ${escapeHtml(venue)}</p>
           <p style="margin: 0; font-size: 15px;">📅 ${dateFormatted}</p>
           <p style="margin: 0; font-size: 15px;">🕐 ${timeFormatted}</p>
         </div>
@@ -580,7 +591,7 @@ export async function sendSignupConfirmationEmail({
         </div>
 
         <p style="font-size: 16px; color: #f8f8f8; margin: 0 0 16px;">
-          Hey ${performerName} — you're locked in. We'll send you reminders as the date gets closer.
+          Hey ${escapeHtml(performerName)} — you're locked in. We'll send you reminders as the date gets closer.
         </p>
 
         <p style="font-size: 15px; color: #aaa; margin: 0 0 24px;">
@@ -635,10 +646,10 @@ export async function sendNewSignupNotificationEmail({
   const dateFormatted = formatDate(date)
   const timeFormatted = formatTime(startTime)
   const instagramRow = performerInstagram
-    ? `<p style="margin: 0; font-size: 14px; color: #aaa;">📸 @${performerInstagram.replace(/^@/, "")}</p>`
+    ? `<p style="margin: 0; font-size: 14px; color: #aaa;">📸 @${escapeHtml(performerInstagram.replace(/^@/, ""))}</p>`
     : ""
   const emailRow = performerEmail
-    ? `<p style="margin: 0; font-size: 14px; color: #aaa;">✉️ ${performerEmail}</p>`
+    ? `<p style="margin: 0; font-size: 14px; color: #aaa;">✉️ ${escapeHtml(performerEmail)}</p>`
     : ""
 
   await resend.emails.send({
@@ -652,17 +663,17 @@ export async function sendNewSignupNotificationEmail({
         </h1>
         <p style="color: #aaa; margin: 0 0 32px;">Someone just signed up.</p>
 
-        <h2 style="font-size: 20px; font-weight: 700; margin: 0 0 16px;">${micName}</h2>
+        <h2 style="font-size: 20px; font-weight: 700; margin: 0 0 16px;">${escapeHtml(micName)}</h2>
 
         <div style="display: flex; flex-direction: column; gap: 8px; margin: 0 0 24px;">
-          <p style="margin: 0; font-size: 15px;">📍 ${venue}</p>
+          <p style="margin: 0; font-size: 15px;">📍 ${escapeHtml(venue)}</p>
           <p style="margin: 0; font-size: 15px;">📅 ${dateFormatted}</p>
           <p style="margin: 0; font-size: 15px;">🕐 ${timeFormatted}</p>
         </div>
 
         <div style="margin: 0 0 24px; padding: 20px; background: #111124; border-radius: 8px; border: 1px solid #333;">
           <p style="margin: 0 0 4px; font-size: 12px; text-transform: uppercase; letter-spacing: 0.1em; color: #aaa;">Slot #${slotNumber}</p>
-          <p style="margin: 0 0 8px; font-size: 22px; font-weight: 800; color: #e879a0;">${performerName}</p>
+          <p style="margin: 0 0 8px; font-size: 22px; font-weight: 800; color: #e879a0;">${escapeHtml(performerName)}</p>
           ${instagramRow}
           ${emailRow}
         </div>
@@ -703,7 +714,7 @@ export async function sendHostPinEmail({
         </h1>
         <p style="color: #aaa; margin: 0 0 32px;">Your mic is live. Here's everything you need.</p>
 
-        <h2 style="font-size: 20px; font-weight: 700; margin: 0 0 4px;">${micName}</h2>
+        <h2 style="font-size: 20px; font-weight: 700; margin: 0 0 4px;">${escapeHtml(micName)}</h2>
         <a href="${micUrl}" style="color: #e879a0; font-size: 14px;">${micUrl}</a>
 
         <div style="margin: 32px 0; padding: 24px; background: #111124; border-radius: 8px; border: 1px solid #333; text-align: center;">

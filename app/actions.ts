@@ -1,7 +1,6 @@
 "use server"
 
 import { createAdminClient } from "@/lib/supabase/admin"
-import { createClient } from "@/lib/supabase/server"
 import { put } from "@vercel/blob"
 import { unstable_cache } from "next/cache"
 import {
@@ -19,6 +18,48 @@ function hashPin(pin: string): string {
   return crypto.createHash("sha256").update(pin).digest("hex")
 }
 
+function pinMatches(pin: string, storedHash: string | null): boolean {
+  if (!storedHash) return false
+  const a = Buffer.from(hashPin(String(pin)), "hex")
+  const b = Buffer.from(storedHash, "hex")
+  return a.length === b.length && crypto.timingSafeEqual(a, b)
+}
+
+// Escape LIKE/ILIKE wildcards so user input like "%" can't match other people's rows.
+function escapeLike(value: string): string {
+  return value.replace(/[\\%_]/g, (c) => `\\${c}`)
+}
+
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+const SLUG_RE = /^[a-z0-9](?:[a-z0-9-]{0,78}[a-z0-9])?$/
+const MAX_SECTIONS = 20
+const MAX_SLOTS_PER_SECTION = 200
+const MAX_IMAGE_BYTES = 5 * 1024 * 1024
+const IMAGE_TYPES: Record<string, string> = {
+  "image/jpeg": "jpg",
+  "image/png": "png",
+  "image/webp": "webp",
+  "image/gif": "gif",
+}
+
+function isValidSlotCount(n: unknown): n is number {
+  return Number.isInteger(n) && (n as number) >= 1 && (n as number) <= MAX_SLOTS_PER_SECTION
+}
+
+function validateSections(sections: SectionInput[] | undefined): string | null {
+  if (!Array.isArray(sections) || sections.length === 0) return "At least one section is required"
+  if (sections.length > MAX_SECTIONS) return `At most ${MAX_SECTIONS} sections allowed`
+  for (const sec of sections) {
+    if (!isValidSlotCount(sec.slots)) return `Each section needs 1–${MAX_SLOTS_PER_SECTION} slots`
+    if (typeof sec.startTime !== "string" || !sec.startTime) return "Each section needs a start time"
+  }
+  return null
+}
+
+function isValidImageUrl(url: string | null | undefined): boolean {
+  return !url || /^https:\/\//i.test(url)
+}
+
 function generateSlug(name: string): string {
   const base = name
     .toLowerCase()
@@ -27,12 +68,12 @@ function generateSlug(name: string): string {
     .replace(/-+/g, "-")
     .trim()
   // Short 4-char random suffix to avoid collisions, keeps the URL clean
-  const suffix = Math.random().toString(36).substring(2, 6)
-  return `${base}-${suffix}`
+  const suffix = crypto.randomBytes(3).toString("hex").substring(0, 4)
+  return `${base.replace(/^-+|-+$/g, "").slice(0, 70) || "mic"}-${suffix}`
 }
 
 function generatePin(): string {
-  return Math.floor(100000 + Math.random() * 900000).toString()
+  return crypto.randomInt(100000, 1000000).toString()
 }
 
 // --- Types ---
@@ -101,14 +142,19 @@ export interface SectionInput {
 // --- Actions ---
 
 export async function uploadMicImage(formData: FormData): Promise<{ url?: string; error?: string }> {
-  const file = formData.get("file") as File
-  if (!file) return { error: "No file provided" }
+  const file = formData.get("file")
+  if (!(file instanceof File)) return { error: "No file provided" }
 
-  const ext = file.name.split(".").pop()
-  const filename = `mic-images/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`
+  // Only allow raster images: SVG/HTML could carry script, and the extension
+  // is derived from the validated MIME type rather than the user's filename.
+  const ext = IMAGE_TYPES[file.type]
+  if (!ext) return { error: "Please upload a JPG, PNG, WebP, or GIF image" }
+  if (file.size > MAX_IMAGE_BYTES) return { error: "Image must be 5MB or smaller" }
+
+  const filename = `mic-images/${Date.now()}-${crypto.randomBytes(8).toString("hex")}.${ext}`
 
   try {
-    const blob = await put(filename, file, { access: "public" })
+    const blob = await put(filename, file, { access: "public", contentType: file.type })
     return { url: blob.url }
   } catch (err) {
     console.error("Failed to upload image to Vercel Blob:", err)
@@ -143,10 +189,40 @@ export async function createMic(formData: {
   latitude?: number | null
   longitude?: number | null
 }): Promise<{ success: boolean; slug?: string; hostPin?: string; error?: string }> {
+  if (!formData.name?.trim() || !formData.venue?.trim() || !formData.date) {
+    return { success: false, error: "Name, venue, and date are required" }
+  }
+  const sectionsError = validateSections(formData.sections)
+  if (sectionsError) return { success: false, error: sectionsError }
+  if (formData.hostEmail && !EMAIL_RE.test(formData.hostEmail)) {
+    return { success: false, error: "Invalid email address" }
+  }
+  if (!isValidImageUrl(formData.imageUrl)) return { success: false, error: "Invalid image URL" }
+
   const admin = createAdminClient()
-  const slug = formData.slug?.trim() || generateSlug(formData.name)
+  const slug = formData.slug?.trim().toLowerCase() || generateSlug(formData.name)
+  if (!SLUG_RE.test(slug)) {
+    return { success: false, error: "URL can only contain lowercase letters, numbers, and dashes" }
+  }
+  if (formData.hostPin !== undefined && !/^\d{6}$/.test(formData.hostPin)) {
+    return { success: false, error: "Invalid PIN" }
+  }
   const hostPin = formData.hostPin || generatePin()
   const hostPinHash = hashPin(hostPin)
+
+  // Joining an existing series requires that series' PIN; otherwise anyone could
+  // inject dates into another host's series.
+  if (formData.seriesSlug) {
+    const { data: existingSeries } = await admin
+      .from("mics")
+      .select("host_pin_hash")
+      .eq("series_slug", formData.seriesSlug)
+      .limit(1)
+      .maybeSingle()
+    if (existingSeries && !pinMatches(hostPin, existingSeries.host_pin_hash)) {
+      return { success: false, error: "Unauthorized" }
+    }
+  }
 
   const firstSection = formData.sections[0]
   const totalSlots = formData.sections.reduce((sum, s) => sum + s.slots, 0)
@@ -316,13 +392,16 @@ function buildMicData(
   }
 }
 
+// Public columns only — never select host_pin_hash, host_email, or performer emails here.
+const PUBLIC_MIC_COLUMNS =
+  "id, slug, name, venue, date, start_time, end_time, total_slots, notes, image_url, series_slug, series_name, signup_opens_at, send_reminders, send_two_day_reminder, place_id, formatted_address, latitude, longitude"
+
 export async function getMic(slug: string): Promise<{ mic: MicData | null; error?: string }> {
-  const supabase = await createClient()
   const admin = createAdminClient()
 
-  const { data: mic, error: micError } = await supabase
+  const { data: mic, error: micError } = await admin
     .from("mics")
-    .select("*")
+    .select(PUBLIC_MIC_COLUMNS)
     .eq("slug", slug)
     .single()
 
@@ -331,12 +410,12 @@ export async function getMic(slug: string): Promise<{ mic: MicData | null; error
   }
 
   const [{ data: slots, error: slotsError }, { data: sections }, { count: waitlistCount }] = await Promise.all([
-    supabase
+    admin
       .from("slots")
       .select("id, slot_number, taken, performer_name, performer_instagram, section_id")
       .eq("mic_id", mic.id)
       .order("slot_number", { ascending: true }),
-    supabase
+    admin
       .from("sections")
       .select("*")
       .eq("mic_id", mic.id)
@@ -455,15 +534,22 @@ export async function signupForSlot(
   instagram: string,
   email: string
 ): Promise<{ success: boolean; error?: string }> {
+  if (!Number.isInteger(slotNumber) || slotNumber < 1) return { success: false, error: "Invalid slot" }
+  if (!name?.trim()) return { success: false, error: "Name is required" }
+  if (email && !EMAIL_RE.test(email)) return { success: false, error: "Invalid email address" }
+
   const admin = createAdminClient()
 
   const { data: mic } = await admin
     .from("mics")
-    .select("id, name, slug, venue, date, start_time, end_time, timezone, host_email")
+    .select("id, name, slug, venue, date, start_time, end_time, timezone, host_email, signup_opens_at")
     .eq("slug", micSlug)
     .single()
 
   if (!mic) return { success: false, error: "Mic not found" }
+  if (mic.signup_opens_at && new Date(mic.signup_opens_at).getTime() > Date.now()) {
+    return { success: false, error: "Sign-ups aren't open yet" }
+  }
 
   const { data: updated, error } = await admin
     .from("slots")
@@ -642,8 +728,7 @@ export async function verifyHostPin(
 
   if (!mic) return { success: false, error: "Mic not found" }
 
-  const pinHash = hashPin(pin)
-  if (pinHash !== mic.host_pin_hash) {
+  if (typeof pin !== "string" || !pinMatches(pin, mic.host_pin_hash)) {
     return { success: false, error: "Invalid PIN" }
   }
 
@@ -757,17 +842,43 @@ export async function hostUpdateMic(
   const verified = await verifyHostPin(micSlug, pin)
   if (!verified.success) return { success: false, error: "Unauthorized" }
 
+  if (data.sections && data.sections.length > 0) {
+    const sectionsError = validateSections(data.sections)
+    if (sectionsError) return { success: false, error: sectionsError }
+  }
+  if (data.totalSlots !== undefined && !isValidSlotCount(data.totalSlots)) {
+    return { success: false, error: `Slots must be 1–${MAX_SLOTS_PER_SECTION}` }
+  }
+  if (!isValidImageUrl(data.imageUrl)) return { success: false, error: "Invalid image URL" }
+
   const admin = createAdminClient()
 
   const { data: mic } = await admin
     .from("mics")
-    .select("id, total_slots")
+    .select("id, total_slots, host_pin_hash")
     .eq("slug", micSlug)
     .single()
 
   if (!mic) return { success: false, error: "Mic not found" }
 
-  const newSlug = data.slug?.trim() || micSlug
+  const newSlug = data.slug?.trim().toLowerCase() || micSlug
+  if (newSlug !== micSlug && !SLUG_RE.test(newSlug)) {
+    return { success: false, error: "URL can only contain lowercase letters, numbers, and dashes" }
+  }
+
+  // Can't attach this mic to someone else's series.
+  if (data.seriesSlug) {
+    const { data: otherInSeries } = await admin
+      .from("mics")
+      .select("host_pin_hash")
+      .eq("series_slug", data.seriesSlug)
+      .neq("id", mic.id)
+      .limit(1)
+      .maybeSingle()
+    if (otherInSeries && otherInSeries.host_pin_hash !== mic.host_pin_hash) {
+      return { success: false, error: "Unauthorized" }
+    }
+  }
 
   // Derive start_time / end_time / total_slots for the mic row
   let startTime = data.startTime || ""
@@ -870,13 +981,23 @@ export async function hostUpdateSeriesMics(
   const verified = await verifyHostPin(micSlug, pin)
   if (!verified.success) return { success: false, error: "Unauthorized" }
 
-  const admin = createAdminClient()
+  if (data.sections && data.sections.length > 0) {
+    const sectionsError = validateSections(data.sections)
+    if (sectionsError) return { success: false, error: sectionsError }
+  }
+  if (!isValidImageUrl(data.imageUrl)) return { success: false, error: "Invalid image URL" }
 
-  // Fetch all mics in the series
+  const admin = createAdminClient()
+  // Series instances share the host PIN. Scope every write to mics with this PIN's
+  // hash so a host can't edit another host's series by passing its seriesSlug.
+  const pinHash = hashPin(pin)
+
+  // Fetch all mics in the series owned by this PIN
   const { data: seriesMics } = await admin
     .from("mics")
     .select("id, slug, total_slots")
     .eq("series_slug", seriesSlug)
+    .eq("host_pin_hash", pinHash)
 
   if (!seriesMics?.length) return { success: false, error: "Series not found" }
 
@@ -910,6 +1031,7 @@ export async function hostUpdateSeriesMics(
     .from("mics")
     .update(sharedUpdate)
     .eq("series_slug", seriesSlug)
+    .eq("host_pin_hash", pinHash)
 
   if (error) {
     console.error("Failed to update series mics:", error)
@@ -1064,6 +1186,9 @@ export async function joinWaitlist(
   instagram: string,
   email: string
 ): Promise<{ success: boolean; position?: number; error?: string }> {
+  if (!name?.trim()) return { success: false, error: "Name is required" }
+  if (!EMAIL_RE.test(email ?? "")) return { success: false, error: "Invalid email address" }
+
   const admin = createAdminClient()
 
   const { data: mic } = await admin
@@ -1079,7 +1204,7 @@ export async function joinWaitlist(
     .from("waitlist_entries")
     .select("id")
     .eq("mic_id", mic.id)
-    .ilike("performer_email", email)
+    .ilike("performer_email", escapeLike(email))
     .maybeSingle()
 
   if (existingWaitlist) return { success: false, error: "You're already on the waitlist" }
@@ -1089,7 +1214,7 @@ export async function joinWaitlist(
     .from("slots")
     .select("id")
     .eq("mic_id", mic.id)
-    .ilike("performer_email", email)
+    .ilike("performer_email", escapeLike(email))
     .eq("taken", true)
     .maybeSingle()
 
@@ -1148,7 +1273,7 @@ export async function leaveWaitlist(
     .from("waitlist_entries")
     .select("id")
     .eq("mic_id", mic.id)
-    .ilike("performer_email", email)
+    .ilike("performer_email", escapeLike(email))
     .maybeSingle()
 
   if (!entry) return { success: false, error: "You're not on the waitlist" }
@@ -1173,7 +1298,15 @@ export async function hostRemoveWaitlistEntry(
 
   const admin = createAdminClient()
 
-  const { error } = await admin.from("waitlist_entries").delete().eq("id", entryId)
+  const { data: mic } = await admin.from("mics").select("id").eq("slug", micSlug).single()
+  if (!mic) return { success: false, error: "Mic not found" }
+
+  // Scope to this mic so a host can't delete entries on other hosts' mics.
+  const { error } = await admin
+    .from("waitlist_entries")
+    .delete()
+    .eq("id", entryId)
+    .eq("mic_id", mic.id)
 
   if (error) {
     console.error("Failed to remove waitlist entry:", error)

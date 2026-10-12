@@ -11,16 +11,24 @@ function adminToken(): string {
   return crypto.createHash("sha256").update(password + "mic-drop-admin").digest("hex")
 }
 
+// Constant-time string comparison (hash both sides so lengths always match).
+function safeEqual(a: string, b: string): boolean {
+  const ha = crypto.createHash("sha256").update(a).digest()
+  const hb = crypto.createHash("sha256").update(b).digest()
+  return crypto.timingSafeEqual(ha, hb)
+}
+
 export async function adminLogin(
   password: string
 ): Promise<{ success: boolean; error?: string }> {
   if (!process.env.ADMIN_PASSWORD) return { success: false, error: "Admin not configured." }
-  if (password !== process.env.ADMIN_PASSWORD) return { success: false, error: "Wrong password." }
+  if (!safeEqual(password, process.env.ADMIN_PASSWORD)) return { success: false, error: "Wrong password." }
 
   const cookieStore = await cookies()
   cookieStore.set("admin-token", adminToken(), {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
+    sameSite: "strict",
     maxAge: 60 * 60 * 24 * 7, // 7 days
     path: "/",
   })
@@ -37,10 +45,13 @@ export async function checkAdminAuth(): Promise<boolean> {
   if (!process.env.ADMIN_PASSWORD) return false
   const cookieStore = await cookies()
   const token = cookieStore.get("admin-token")?.value
-  return token === adminToken()
+  return !!token && safeEqual(token, adminToken())
 }
 
+// Every exported function in a "use server" file is a publicly callable endpoint,
+// so each one must check auth itself — page-level redirects do not protect them.
 export async function getAllMics() {
+  if (!(await checkAdminAuth())) return []
   const admin = createAdminClient()
 
   const { data: mics, error } = await admin
@@ -77,6 +88,7 @@ export async function getAllMics() {
 }
 
 export async function deleteMic(slug: string): Promise<{ success: boolean; error?: string }> {
+  if (!(await checkAdminAuth())) return { success: false, error: "Unauthorized" }
   const admin = createAdminClient()
   const { error } = await admin.from("mics").delete().eq("slug", slug)
   if (error) return { success: false, error: error.message }
@@ -176,6 +188,7 @@ export async function sendMicReminders(slug: string, target: "lineup" | "waitlis
 export async function sendTestReminderEmail(slug: string, toEmail: string, target: "lineup" | "waitlist"): Promise<{ success: boolean; error?: string }> {
   const authed = await checkAdminAuth()
   if (!authed) return { success: false, error: "Unauthorized" }
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(toEmail)) return { success: false, error: "Invalid email" }
 
   const data = await getMicAndPerformers(slug)
   if (!data) return { success: false, error: "Mic not found" }
@@ -193,6 +206,7 @@ export async function sendTestReminderEmail(slug: string, toEmail: string, targe
 }
 
 export async function getAdminMicDetail(slug: string) {
+  if (!(await checkAdminAuth())) return null
   const admin = createAdminClient()
 
   const { data: mic } = await admin
