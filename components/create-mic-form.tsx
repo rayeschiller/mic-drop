@@ -146,7 +146,7 @@ export function CreateMicForm() {
     }))
 
     // For recurring series, generate a shared PIN and series slug once
-    const sharedPin = isRecurring ? Math.floor(100000 + Math.random() * 900000).toString() : undefined
+    const sharedPin = isRecurring ? (100000 + (crypto.getRandomValues(new Uint32Array(1))[0] % 900000)).toString() : undefined
     const seriesSlug = isRecurring ? `${toSlug(formData.name)}-${Math.random().toString(36).substring(2, 6)}` : undefined
     const seriesName = isRecurring ? formData.name : undefined
 

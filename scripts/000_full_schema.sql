@@ -78,38 +78,11 @@ alter table public.sections         enable row level security;
 alter table public.slots            enable row level security;
 alter table public.waitlist_entries enable row level security;
 
--- Public read (all writes go through service role in server actions)
-do $$ begin
-  if not exists (
-    select 1 from pg_policies where tablename = 'mics' and policyname = 'mics_public_read'
-  ) then
-    create policy "mics_public_read" on public.mics for select using (true);
-  end if;
-end $$;
-
-do $$ begin
-  if not exists (
-    select 1 from pg_policies where tablename = 'sections' and policyname = 'sections_public_read'
-  ) then
-    create policy "sections_public_read" on public.sections for select using (true);
-  end if;
-end $$;
-
-do $$ begin
-  if not exists (
-    select 1 from pg_policies where tablename = 'slots' and policyname = 'slots_public_read'
-  ) then
-    create policy "slots_public_read" on public.slots for select using (true);
-  end if;
-end $$;
-
-do $$ begin
-  if not exists (
-    select 1 from pg_policies where tablename = 'waitlist_entries' and policyname = 'waitlist_public_read'
-  ) then
-    create policy "waitlist_public_read" on public.waitlist_entries for select using (true);
-  end if;
-end $$;
+-- No policies: anon/authenticated are denied everything. All reads and writes
+-- go through server actions using the service role, which bypasses RLS and
+-- returns only public columns. Do NOT add `using (true)` read policies — the
+-- anon key is public, and these tables hold PIN hashes and emails.
+revoke all on public.mics, public.sections, public.slots, public.waitlist_entries from anon, authenticated;
 
 -- -------------------------------------------------------
 -- Indexes
