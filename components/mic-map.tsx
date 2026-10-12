@@ -1,7 +1,7 @@
 'use client'
 
-import { useState } from 'react'
-import { Map, AdvancedMarker, InfoWindow } from '@vis.gl/react-google-maps'
+import { useEffect, useState } from 'react'
+import { Map, AdvancedMarker, InfoWindow, useMap, useApiLoadingStatus, APILoadingStatus } from '@vis.gl/react-google-maps'
 import type { MicLocationData } from '@/app/actions'
 
 function formatDate(dateStr: string) {
@@ -23,18 +23,37 @@ interface MicMapProps {
   zoom: number
 }
 
+function MapCamera({ center, zoom }: Pick<MicMapProps, 'center' | 'zoom'>) {
+  const map = useMap()
+  useEffect(() => {
+    map?.moveCamera({ center: { lat: center.lat, lng: center.lng }, zoom })
+  }, [map, center.lat, center.lng, zoom])
+  return null
+}
+
 export default function MicMap({ mics, userLocation, center, zoom }: MicMapProps) {
   const [openMicId, setOpenMicId] = useState<string | null>(null)
+  const status = useApiLoadingStatus()
+
+  if (!process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY?.trim() ||
+      status === APILoadingStatus.FAILED || status === APILoadingStatus.AUTH_FAILURE) {
+    return (
+      <div role="status" className="w-full h-full flex items-center justify-center bg-secondary/30 p-6 text-center text-muted-foreground">
+        The map is unavailable right now. You can still browse and sign up for mics below.
+      </div>
+    )
+  }
 
   return (
     <Map
       defaultCenter={center}
       defaultZoom={zoom}
-      mapId="mic-drop-map"
+      mapId={process.env.NEXT_PUBLIC_GOOGLE_MAPS_MAP_ID?.trim() || 'DEMO_MAP_ID'}
       gestureHandling="cooperative"
       disableDefaultUI={false}
       style={{ width: '100%', height: '100%' }}
     >
+      <MapCamera center={center} zoom={zoom} />
       {/* User location dot */}
       {userLocation && (
         <AdvancedMarker position={{ lat: userLocation[0], lng: userLocation[1] }}>
