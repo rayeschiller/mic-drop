@@ -1,4 +1,5 @@
 import Link from "next/link"
+import { AccountLink } from "@/components/account-link"
 import { Button } from "@/components/ui/button"
 import { Mic2, Plus, Sparkles, MapPin } from "lucide-react"
 import { NearbyMics } from "@/components/nearby-mics"
@@ -15,6 +16,7 @@ export default function HomePage() {
               Mic<span className="text-neon-pink">Drop</span>
             </span>
           </Link>
+          <AccountLink />
           <Link href="/create">
             <Button className="bg-neon-pink text-primary-foreground hover:bg-neon-pink/90 font-bold">
               <Plus className="mr-2 h-4 w-4" />
@@ -53,7 +55,7 @@ export default function HomePage() {
 
             <p className="mt-8 max-w-xl text-lg text-muted-foreground md:text-xl leading-relaxed">
               Create a mic. Share the link. Let comedians sign up. 
-              No accounts, no fees, no existential dread.
+              Free accounts, no fees, no existential dread.
             </p>
 
             <div className="mt-12 flex flex-col gap-4 sm:flex-row">

@@ -2,7 +2,21 @@ import { Resend } from "resend"
 
 const resend = new Resend(process.env.RESEND_API_KEY)
 
-const SITE_URL = "https://mics.rayeschiller.com"
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "https://mics.rayeschiller.com"
+
+// Preview deployments never send application mail unless explicitly enabled.
+function mailEnabled() {
+  return process.env.EMAIL_ENABLED === "true" ||
+    (process.env.EMAIL_ENABLED !== "false" && process.env.VERCEL_ENV === "production")
+}
+async function sendEmail(...args: Parameters<typeof resend.emails.send>) {
+  if (!mailEnabled()) return
+  return resend.emails.send(...args)
+}
+async function sendBatch(...args: Parameters<typeof resend.batch.send>) {
+  if (!mailEnabled()) return
+  return resend.batch.send(...args)
+}
 
 function micLink(micSlug: string): string {
   return `${SITE_URL}/${micSlug}`
@@ -97,7 +111,7 @@ export async function sendPerformerReminderEmails({
   const dateFormatted = formatDate(date)
   const timeFormatted = formatTime(startTime)
 
-  await resend.batch.send(
+  await sendBatch(
     performers.map(({ name, email }) => ({
       from: process.env.RESEND_FROM_EMAIL ?? "Mic Drop <noreply@yourdomain.com>",
       to: email,
@@ -153,7 +167,7 @@ export async function sendTwoDayReminderEmails({
   const dateFormatted = formatDate(date)
   const timeFormatted = formatTime(startTime)
 
-  await resend.batch.send(
+  await sendBatch(
     performers.map(({ name, email }) => ({
       from: process.env.RESEND_FROM_EMAIL ?? "Mic Drop <noreply@yourdomain.com>",
       to: email,
@@ -209,7 +223,7 @@ export async function sendWeekReminderEmails({
   const dateFormatted = formatDate(date)
   const timeFormatted = formatTime(startTime)
 
-  await resend.batch.send(
+  await sendBatch(
     performers.map(({ name, email }) => ({
       from: process.env.RESEND_FROM_EMAIL ?? "Mic Drop <noreply@yourdomain.com>",
       to: email,
@@ -269,7 +283,7 @@ export async function sendWaitlistConfirmationEmail({
   const dateFormatted = formatDate(date)
   const timeFormatted = formatTime(startTime)
 
-  await resend.emails.send({
+  await sendEmail({
     from: process.env.RESEND_FROM_EMAIL ?? "Mic Drop <noreply@yourdomain.com>",
     to,
     subject: `You're #${position} on the waitlist — ${micName}`,
@@ -330,7 +344,7 @@ export async function sendWaitlistPromotionEmail({
   const dateFormatted = formatDate(date)
   const timeFormatted = formatTime(startTime)
 
-  await resend.emails.send({
+  await sendEmail({
     from: process.env.RESEND_FROM_EMAIL ?? "Mic Drop <noreply@yourdomain.com>",
     to,
     subject: `You're in! A slot opened up — ${micName}`,
@@ -389,7 +403,7 @@ export async function sendWaitlistReminderEmails({
   const dateFormatted = formatDate(date)
   const timeFormatted = formatTime(startTime)
 
-  await resend.batch.send(
+  await sendBatch(
     performers.map(({ name, email, position }) => ({
       from: process.env.RESEND_FROM_EMAIL ?? "Mic Drop <noreply@yourdomain.com>",
       to: email,
@@ -474,7 +488,7 @@ export async function sendWeeklyDigestEmail({
         .join("")
     : `<tr><td style="padding: 12px 0; color: #666; font-size: 14px;">No upcoming mics in the next 7 days.</td></tr>`
 
-  await resend.emails.send({
+  await sendEmail({
     from: process.env.RESEND_FROM_EMAIL ?? "Mic Drop <noreply@yourdomain.com>",
     to,
     subject: `Mic Drop weekly digest — ${new Date().toLocaleDateString("en-US", { month: "long", day: "numeric" })}`,
@@ -566,7 +580,7 @@ export async function sendSignupConfirmationEmail({
     details: `You're slot #${slotNumber} at ${micName}.\n\nLineup: ${micUrl}`,
   })
 
-  await resend.emails.send({
+  await sendEmail({
     from: process.env.RESEND_FROM_EMAIL ?? "Mic Drop <noreply@yourdomain.com>",
     to,
     subject: `You're on the list — ${micName}`,
@@ -652,7 +666,7 @@ export async function sendNewSignupNotificationEmail({
     ? `<p style="margin: 0; font-size: 14px; color: #aaa;">✉️ ${escapeHtml(performerEmail)}</p>`
     : ""
 
-  await resend.emails.send({
+  await sendEmail({
     from: process.env.RESEND_FROM_EMAIL ?? "Mic Drop <noreply@yourdomain.com>",
     to,
     subject: `New signup — ${performerName} grabbed slot #${slotNumber} at ${micName}`,
@@ -703,7 +717,7 @@ export async function sendHostPinEmail({
 }) {
   const micUrl = micLink(micSlug)
 
-  await resend.emails.send({
+  await sendEmail({
     from: process.env.RESEND_FROM_EMAIL ?? "Mic Drop <noreply@yourdomain.com>",
     to,
     subject: `Your host PIN for "${micName}"`,

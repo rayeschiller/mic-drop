@@ -1,0 +1,10 @@
+const required = ["NEXT_PUBLIC_SUPABASE_URL", "NEXT_PUBLIC_SUPABASE_ANON_KEY", "SUPABASE_SERVICE_ROLE_KEY", "NEXT_PUBLIC_SITE_URL"]
+const missing = required.filter(key => !process.env[key])
+if (missing.length) throw new Error(`Missing staging settings: ${missing.join(", ")}`)
+const site = new URL(process.env.NEXT_PUBLIC_SITE_URL)
+const database = new URL(process.env.NEXT_PUBLIC_SUPABASE_URL)
+if (site.protocol !== "https:" || database.protocol !== "https:") throw new Error("Staging URLs must use HTTPS")
+if (["mics.rayeschiller.com", "micdrop.site", "www.micdrop.site"].includes(site.hostname)) throw new Error("Staging cannot use the production site URL")
+if (process.env.EMAIL_ENABLED !== "false") throw new Error("Set EMAIL_ENABLED=false for staging")
+if (process.env.PRODUCTION_SUPABASE_URL && database.origin === new URL(process.env.PRODUCTION_SUPABASE_URL).origin) throw new Error("Staging must use a separate Supabase project")
+console.log("Staging settings validated. Verify the Supabase project is separate from production before deploying.")

@@ -32,7 +32,8 @@ export async function updateSession(request: NextRequest) {
   )
 
   // Refresh session tokens if they exist
-  await supabase.auth.getUser()
+  await supabase.auth.getClaims()
 
+  supabaseResponse.headers.set("Cache-Control", "private, no-store")
   return supabaseResponse
 }
