@@ -238,10 +238,12 @@ export function MicPageClient({
   slug,
   initialMic,
   initialOtherDates,
+  accountHost = false,
 }: {
   slug: string
   initialMic: MicData | null
   initialOtherDates: OtherDate[]
+  accountHost?: boolean
 }) {
   const router = useRouter()
   const [mic, setMic] = useState<MicData | null>(initialMic)
@@ -253,8 +255,8 @@ export function MicPageClient({
   const [isLoading, setIsLoading] = useState(initialMic === null)
 
   // Host mode state
-  const [isHost, setIsHost] = useState(false)
-  const [hostPin, setHostPin] = useState<string | null>(null)
+  const [isHost, setIsHost] = useState(accountHost)
+  const [hostPin, setHostPin] = useState<string | null>(accountHost ? "" : null)
   const [hostPinModalOpen, setHostPinModalOpen] = useState(false)
   const [editModalOpen, setEditModalOpen] = useState(false)
 
@@ -274,7 +276,7 @@ export function MicPageClient({
   const [timeLeft, setTimeLeft] = useState(0)
 
   const loadMic = useCallback(async () => {
-    if (isHost && hostPin) {
+    if (isHost && hostPin !== null) {
       const result = await getMicWithEmails(slug, hostPin)
       if (result.mic) setMic(result.mic)
     } else {
@@ -367,7 +369,7 @@ export function MicPageClient({
   }
 
   const handleHostRemove = async (slotNumber: number) => {
-    if (!hostPin) return
+    if (hostPin === null) return
     const result = await hostRemoveSlot(slug, hostPin, slotNumber)
     if (result.success) {
       await loadMic()
@@ -410,7 +412,7 @@ export function MicPageClient({
     customDays?: number[]
     applyToSeries?: boolean
   }) => {
-    if (!hostPin) return
+    if (hostPin === null) return
     const timezone =
       (typeof Intl !== "undefined" && Intl.DateTimeFormat().resolvedOptions().timeZone) ||
       undefined
@@ -475,7 +477,7 @@ export function MicPageClient({
           sections: sectionPayload,
           seriesSlug: newSeriesSlug,
           seriesName: data.seriesName || data.name,
-          hostPin: hostPin ?? undefined,
+          hostPin: hostPin || undefined,
           signupOpensAt: data.signupOpensAt || undefined,
           sendReminders: data.sendReminders,
           sendTwoDayReminder: data.sendTwoDayReminder,
@@ -515,7 +517,7 @@ export function MicPageClient({
   }
 
   const handleHostRemoveWaitlistEntry = async (entryId: string) => {
-    if (!hostPin) return
+    if (hostPin === null) return
     const result = await hostRemoveWaitlistEntry(slug, hostPin, entryId)
     if (result.success) {
       await loadMic()
@@ -594,6 +596,7 @@ export function MicPageClient({
             </span>
           </Link>
           <div className="flex items-center gap-2">
+            <Link href={`/account?mic=${encodeURIComponent(slug)}`} className="text-sm text-primary hover:underline">Save to account</Link>
             {isHost ? (
               <Button
                 variant="outline"

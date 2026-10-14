@@ -1,3 +1,4 @@
+import { getAccountMicAccess } from "@/app/account/actions"
 import type { Metadata } from "next"
 import { getMic, getMicsBySeries } from "@/app/actions"
 import { MicPageClient } from "./mic-page-client"
@@ -37,5 +38,6 @@ export default async function MicPage({ params }: { params: Promise<{ slug: stri
   const otherDates = mic?.seriesSlug
     ? await getMicsBySeries(mic.seriesSlug, mic.id)
     : []
-  return <MicPageClient slug={slug} initialMic={mic ?? null} initialOtherDates={otherDates} />
+  const accountHost = mic ? await getAccountMicAccess(slug) : false
+  return <MicPageClient accountHost={accountHost} slug={slug} initialMic={mic ?? null} initialOtherDates={otherDates} />
 }

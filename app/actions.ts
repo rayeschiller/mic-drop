@@ -1,5 +1,7 @@
 "use server"
 
+import { createClient } from "@/lib/supabase/server"
+import { getAccountMicAccess } from "@/app/account/actions"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { put } from "@vercel/blob"
 import { unstable_cache } from "next/cache"
@@ -199,6 +201,8 @@ export async function createMic(formData: {
   }
   if (!isValidImageUrl(formData.imageUrl)) return { success: false, error: "Invalid image URL" }
 
+  const auth = await createClient()
+  const { data: { user } } = await auth.auth.getUser()
   const admin = createAdminClient()
   const slug = formData.slug?.trim().toLowerCase() || generateSlug(formData.name)
   if (!SLUG_RE.test(slug)) {
@@ -215,11 +219,11 @@ export async function createMic(formData: {
   if (formData.seriesSlug) {
     const { data: existingSeries } = await admin
       .from("mics")
-      .select("host_pin_hash")
+      .select("host_pin_hash,owner_user_id")
       .eq("series_slug", formData.seriesSlug)
       .limit(1)
       .maybeSingle()
-    if (existingSeries && !pinMatches(hostPin, existingSeries.host_pin_hash)) {
+    if (existingSeries && !(user && existingSeries.owner_user_id === user.id) && !pinMatches(hostPin, existingSeries.host_pin_hash)) {
       return { success: false, error: "Unauthorized" }
     }
   }
@@ -232,6 +236,7 @@ export async function createMic(formData: {
     .from("mics")
     .insert({
       slug,
+      owner_user_id: user?.id ?? null,
       host_pin_hash: hostPinHash,
       host_email: formData.hostEmail || null,
       image_url: formData.imageUrl || null,
@@ -718,6 +723,7 @@ export async function verifyHostPin(
   micSlug: string,
   pin: string
 ): Promise<{ success: boolean; error?: string }> {
+  if (await getAccountMicAccess(micSlug)) return { success: true }
   const admin = createAdminClient()
 
   const { data: mic } = await admin
@@ -855,7 +861,7 @@ export async function hostUpdateMic(
 
   const { data: mic } = await admin
     .from("mics")
-    .select("id, total_slots, host_pin_hash")
+    .select("id, total_slots, host_pin_hash, owner_user_id")
     .eq("slug", micSlug)
     .single()
 
@@ -870,12 +876,12 @@ export async function hostUpdateMic(
   if (data.seriesSlug) {
     const { data: otherInSeries } = await admin
       .from("mics")
-      .select("host_pin_hash")
+      .select("host_pin_hash,owner_user_id")
       .eq("series_slug", data.seriesSlug)
       .neq("id", mic.id)
       .limit(1)
       .maybeSingle()
-    if (otherInSeries && otherInSeries.host_pin_hash !== mic.host_pin_hash) {
+    if (otherInSeries && otherInSeries.host_pin_hash !== mic.host_pin_hash && !(mic.owner_user_id && mic.owner_user_id === otherInSeries.owner_user_id && await getAccountMicAccess(micSlug))) {
       return { success: false, error: "Unauthorized" }
     }
   }
@@ -988,16 +994,23 @@ export async function hostUpdateSeriesMics(
   if (!isValidImageUrl(data.imageUrl)) return { success: false, error: "Invalid image URL" }
 
   const admin = createAdminClient()
-  // Series instances share the host PIN. Scope every write to mics with this PIN's
-  // hash so a host can't edit another host's series by passing its seriesSlug.
+  // Scope series writes to the verified account owner or to the supplied PIN hash.
   const pinHash = hashPin(pin)
+  const accountAccess = await getAccountMicAccess(micSlug)
+  let ownerId: string | null = null
+  if (accountAccess) {
+    const auth = await createClient()
+    const { data: { user } } = await auth.auth.getUser()
+    if (!user) return { success: false, error: "Unauthorized" }
+    ownerId = user.id
+  }
 
-  // Fetch all mics in the series owned by this PIN
+  // Fetch only series dates authorized by the account or PIN.
   const { data: seriesMics } = await admin
     .from("mics")
     .select("id, slug, total_slots")
     .eq("series_slug", seriesSlug)
-    .eq("host_pin_hash", pinHash)
+    .eq(ownerId ? "owner_user_id" : "host_pin_hash", ownerId ?? pinHash)
 
   if (!seriesMics?.length) return { success: false, error: "Series not found" }
 
@@ -1031,7 +1044,7 @@ export async function hostUpdateSeriesMics(
     .from("mics")
     .update(sharedUpdate)
     .eq("series_slug", seriesSlug)
-    .eq("host_pin_hash", pinHash)
+    .eq(ownerId ? "owner_user_id" : "host_pin_hash", ownerId ?? pinHash)
 
   if (error) {
     console.error("Failed to update series mics:", error)

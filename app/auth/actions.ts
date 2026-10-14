@@ -7,13 +7,21 @@ import { revalidatePath } from "next/cache"
 
 export type AuthResult = { error?: string; message?: string }
 export async function authenticate(mode: string, form: FormData): Promise<AuthResult> {
-  if (!["login", "signup", "reset", "password"].includes(mode)) return { error: "Invalid request." }
+  if (!["login", "signup", "reset", "password", "magic"].includes(mode)) return { error: "Invalid request." }
   const email = String(form.get("email") ?? "").trim()
   const password = String(form.get("password") ?? "")
   const next = safeNext(String(form.get("next") ?? ""))
   if (mode !== "password" && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return { error: "Enter a valid email address." }
-  if (mode !== "reset" && (password.length < 8 || password.length > 128)) return { error: "Use a password with 8–128 characters." }
+  if (!["reset", "magic"].includes(mode) && (password.length < 8 || password.length > 128)) return { error: "Use a password with 8–128 characters." }
   const supabase = await createClient()
+  if (mode === "magic") {
+    const { error } = await supabase.auth.signInWithOtp({ email, options: {
+      shouldCreateUser: true,
+      emailRedirectTo: `${siteUrl()}/auth/callback?next=${encodeURIComponent(next)}`,
+    } })
+    if (error) return { error: "Unable to send a sign-in link. Please try again later." }
+    return { message: "Check your email for your sign-in link. Use it to continue without a password." }
+  }
   if (mode === "reset") {
     const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo: `${siteUrl()}/auth/callback?next=/account?reset=1` })
     if (error) return { error: "Unable to request a reset. Please try again later." }
@@ -44,4 +52,19 @@ export async function signOut() {
   if (error) throw new Error("Unable to sign out. Please try again.")
   revalidatePath("/", "layout")
   redirect("/")
+}
+
+export async function googleSignIn(form: FormData): Promise<AuthResult> {
+  const supabase = await createClient()
+  const next = safeNext(String(form.get("next") ?? ""))
+  const settings = await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/auth/v1/settings`, {
+    headers: { apikey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY! }, cache: "no-store",
+  }).then(response => response.ok ? response.json() : null).catch(() => null)
+  if (!settings?.external?.google) return { error: "Google sign-in is not available yet. Please use an email link or password." }
+  const { data, error } = await supabase.auth.signInWithOAuth({ provider: "google", options: {
+    redirectTo: `${siteUrl()}/auth/callback?next=${encodeURIComponent(next)}`,
+    scopes: "openid email profile",
+  } })
+  if (error || !data.url) return { error: "Unable to start Google sign-in. Please try again." }
+  redirect(data.url)
 }
