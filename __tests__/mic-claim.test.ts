@@ -40,15 +40,26 @@ describe("PIN enrollment", () => {
     expect(await claimMic(form())).toHaveProperty("error")
     expect(mocks.update).not.toHaveBeenCalled()
   })
-  it("saves using server identity and only updates unclaimed rows", async () => {
-    mocks.maybeSingle.mockResolvedValueOnce({ data: { id: "mic-1", host_pin_hash: hash, owner_user_id: null } }).mockResolvedValueOnce({ data: { id: "mic-1" } })
-    expect(await claimMic(form())).toHaveProperty("message")
-    expect(mocks.update).toHaveBeenCalledWith({ owner_user_id: "user-1" })
-    expect(mocks.is).toHaveBeenCalledWith("owner_user_id", null)
-    expect(mocks.eq).toHaveBeenCalledWith("host_pin_hash", hash)
+  it("enrolls the series with verified server identity and a verified PIN hash", async () => {
+    mocks.maybeSingle.mockResolvedValue({ data: { id: "mic-1", host_pin_hash: hash, owner_user_id: null } })
+    mocks.rpc.mockResolvedValueOnce({ data: true }).mockResolvedValueOnce({ data: [{ saved_count: 6, already_linked_count: 0, skipped_count: 0 }] })
+    expect((await claimMic(form())).message).toContain("6 recurring dates")
+    expect(mocks.rpc).toHaveBeenNthCalledWith(2, "claim_mic_series", { p_mic_id: "mic-1", p_user_id: "user-1", p_pin_hash: hash })
+    expect(mocks.update).not.toHaveBeenCalled()
   })
-  it("fails safely when a simultaneous claim wins", async () => {
-    mocks.maybeSingle.mockResolvedValueOnce({ data: { id: "mic-1", host_pin_hash: hash, owner_user_id: null } }).mockResolvedValueOnce({ data: null })
+  it("can enroll remaining series dates when the main date is already owned", async () => {
+    mocks.maybeSingle.mockResolvedValue({ data: { id: "mic-1", host_pin_hash: hash, owner_user_id: "user-1" } })
+    mocks.rpc.mockResolvedValueOnce({ data: true }).mockResolvedValueOnce({ data: [{ saved_count: 5, already_linked_count: 1, skipped_count: 0 }] })
+    expect((await claimMic(form())).message).toContain("6 recurring dates")
+  })
+  it("reports dates linked to other accounts without transferring them", async () => {
+    mocks.maybeSingle.mockResolvedValue({ data: { id: "mic-1", host_pin_hash: hash, owner_user_id: null } })
+    mocks.rpc.mockResolvedValueOnce({ data: true }).mockResolvedValueOnce({ data: [{ saved_count: 4, already_linked_count: 0, skipped_count: 2 }] })
+    expect((await claimMic(form())).message).toContain("2 date(s) already linked to another account were left alone")
+  })
+  it("fails safely when a conflicting claim wins", async () => {
+    mocks.maybeSingle.mockResolvedValue({ data: { id: "mic-1", host_pin_hash: hash, owner_user_id: null } })
+    mocks.rpc.mockResolvedValueOnce({ data: true }).mockResolvedValueOnce({ data: null, error: { message: "already claimed" } })
     expect(await claimMic(form())).toHaveProperty("error")
   })
   it("checks account host access against the verified owner", async () => {

@@ -25,13 +25,22 @@ export async function claimMic(form: FormData): Promise<{ error?: string; messag
   if (limitError || allowed !== true) return { error: "Too many attempts. Please try again in an hour." }
   const { data: mic, error } = await admin.from("mics").select("id,owner_user_id,host_pin_hash").eq("slug", slug).maybeSingle()
   if (error || !mic || !validClaimPin(pin, mic.host_pin_hash)) return { error: "Mic or host PIN is incorrect." }
-  if (mic.owner_user_id === user.id) return { message: "This mic is already saved to your account." }
-  if (mic.owner_user_id) return { error: "This mic is already linked to another account." }
-  // Compare-and-set prevents simultaneous claims from taking ownership from each other.
-  const { data: saved, error: saveError } = await admin.from("mics").update({ owner_user_id: user.id })
-    .eq("id", mic.id).is("owner_user_id", null).eq("host_pin_hash", mic.host_pin_hash).select("id").maybeSingle()
-  if (saveError || !saved) return { error: "Unable to save this mic. Refresh and try again." }
+  if (mic.owner_user_id && mic.owner_user_id !== user.id) return { error: "This mic is already linked to another account." }
+  // The database operation atomically enrolls unclaimed recurring dates with
+  // this series and verified PIN. It never transfers another account's dates.
+  const { data: result, error: saveError } = await admin.rpc("claim_mic_series", {
+    p_mic_id: mic.id, p_user_id: user.id, p_pin_hash: mic.host_pin_hash,
+  })
+  const summary = result?.[0]
+  if (saveError || !summary) return { error: "Unable to save this mic. Refresh and try again." }
   revalidatePath("/account")
-  revalidatePath(`/${slug}`)
-  return { message: "Mic saved. You can now manage it from your account without entering the PIN." }
+  revalidatePath("/", "layout")
+  const total = summary.saved_count + summary.already_linked_count
+  let message = total > 1
+    ? summary.saved_count
+      ? `Saved ${total} recurring dates to your account. You can manage them without entering the PIN.`
+      : `All ${total} recurring dates are already saved to your account.`
+    : "Mic saved. You can now manage it from your account without entering the PIN."
+  if (summary.skipped_count) message += ` ${summary.skipped_count} date(s) already linked to another account were left alone.`
+  return { message }
 }

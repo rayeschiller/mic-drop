@@ -81,4 +81,4 @@ MIT
 
 ## User authentication and staging
 
-Email/password accounts, confirmation, password reset, and sign-out are available at `/login` and `/account`. See [STAGING.md](STAGING.md) for isolated staging configuration and verification.
+Password, Google, and email magic-link sign-in are available at `/login`. At `/account`, hosts can save existing mics with their URL and PIN, view owned mics, and manage them without entering a PIN again. Google OAuth and custom SMTP require provider credentials. See [STAGING.md](STAGING.md) for isolated staging configuration and verification.

@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>Your MicDrop sign-in link</title>
+</head>
+<body style="margin:0;padding:0;background-color:#f6f2f8;color:#241b30;font-family:Arial,Helvetica,sans-serif;">
+  <div style="display:none;max-height:0;overflow:hidden;opacity:0;color:transparent;">Your one-time link to sign in to MicDrop. The mic is waiting.</div>
+  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background-color:#f6f2f8;">
+    <tr><td align="center" style="padding:40px 16px;">
+      <table role="presentation" width="480" cellspacing="0" cellpadding="0" border="0" style="width:100%;max-width:480px;">
+        <tr><td style="padding:0 6px 20px;">
+          <a href="{{ .SiteURL }}" style="color:#241b30;text-decoration:none;font-size:27px;font-weight:800;letter-spacing:-1.2px;">Mic<span style="color:#c73b87;">Drop</span><span style="font-size:22px;letter-spacing:0;"> 🎤</span></a>
+        </td></tr>
+        <tr><td style="background-color:#ffffff;border:1px solid #e8dfed;border-radius:24px;overflow:hidden;">
+          <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">
+            <tr><td style="padding:32px 30px 0;">
+              <h1 style="margin:0 0 14px;font-size:34px;line-height:1.15;font-weight:800;letter-spacing:-1.3px;color:#241b30;">Hey, you.<br><span style="color:#c73b87;">Your mic is waiting.</span></h1>
+              <p style="margin:0 0 28px;color:#675a70;font-size:16px;line-height:1.65;">Here’s your one-time link to sign in to MicDrop. No password to remember.</p>
+            </td></tr>
+            <tr><td align="center" style="padding:0 30px 28px;">
+              <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0"><tr><td align="center" bgcolor="#c73b87" style="border-radius:12px;">
+                <a href="{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&amp;type=email" style="display:block;padding:18px 20px;border:1px solid #c73b87;border-radius:12px;background-color:#c73b87;color:#ffffff;font-size:16px;line-height:20px;font-weight:700;text-align:center;text-decoration:none;">Sign in to MicDrop &nbsp;→</a>
+              </td></tr></table>
+            </td></tr>
+            <tr><td style="padding:0 30px 30px;">
+              <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0"><tr><td style="border-top:1px solid #eee7f1;padding-top:20px;">
+                <p style="margin:0;color:#75677f;font-size:12px;line-height:1.7;">This link works once. Keep it to yourself.</p>
+                <p style="margin:8px 0 0;color:#75677f;font-size:12px;line-height:1.7;">Didn’t request a sign-in link? You can ignore this email. No heckling required.</p>
+              </td></tr></table>
+            </td></tr>
+          </table>
+        </td></tr>
+        <tr><td align="center" style="padding:22px 12px 0;">
+          <p style="margin:0;color:#8a7c94;font-size:11px;line-height:1.6;letter-spacing:0.4px;">MicDrop · No apps. No drama. Just slots.</p>
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>
