@@ -1,6 +1,6 @@
 import crypto from "node:crypto"
 import { beforeEach, describe, expect, it, vi } from "vitest"
-const mocks = vi.hoisted(() => ({ accountAccess: vi.fn(), getUser: vi.fn(), single: vi.fn(), calls: [] as Array<{ table: string; operation: string; filters: unknown[] }>, results: [] as unknown[] }))
+const mocks = vi.hoisted(() => ({ accountAccess: vi.fn(), getUser: vi.fn(), single: vi.fn(), calls: [] as Array<{ table: string; operation: string; filters: unknown[] }>, inserts: [] as Array<{ table: string; value: unknown }>, results: [] as unknown[] }))
 vi.mock("@/app/account/actions", () => ({ getAccountMicAccess: mocks.accountAccess }))
 vi.mock("@/lib/supabase/server", () => ({ createClient: async () => ({ auth: { getUser: mocks.getUser } }) }))
 vi.mock("@/lib/email", () => ({ sendHostPinEmail: vi.fn(), sendNewSignupNotificationEmail: vi.fn(), sendSignupConfirmationEmail: vi.fn(), sendWaitlistConfirmationEmail: vi.fn(), sendWaitlistPromotionEmail: vi.fn() }))
@@ -8,6 +8,7 @@ vi.mock("@/lib/supabase/admin", () => ({ createAdminClient: () => ({ from: (tabl
   const call = { table, operation: "read", filters: [] as unknown[] }
   const chain = {
     select: vi.fn().mockReturnThis(),
+    insert: vi.fn().mockImplementation((value: unknown) => { mocks.inserts.push({ table, value }); return chain }),
     update: vi.fn().mockImplementation(() => { call.operation = "update"; return chain }),
     eq: vi.fn().mockImplementation((...args: unknown[]) => { call.filters.push(args); return chain }),
     single: mocks.single,
@@ -15,9 +16,9 @@ vi.mock("@/lib/supabase/admin", () => ({ createAdminClient: () => ({ from: (tabl
   }
   return chain
 } }) }))
-import { verifyHostPin, getMicWithEmails, hostRemoveSlot, hostRemoveWaitlistEntry, hostUpdateMic, hostUpdateSeriesMics } from "@/app/actions"
+import { createMic, verifyHostPin, getMicWithEmails, hostRemoveSlot, hostRemoveWaitlistEntry, hostUpdateMic, hostUpdateSeriesMics } from "@/app/actions"
 const hash = crypto.createHash("sha256").update("123456").digest("hex")
-beforeEach(() => { vi.resetAllMocks(); mocks.calls.length = 0; mocks.results.length = 0; mocks.accountAccess.mockResolvedValue(false) })
+beforeEach(() => { vi.resetAllMocks(); mocks.calls.length = 0; mocks.inserts.length = 0; mocks.results.length = 0; mocks.accountAccess.mockResolvedValue(false) })
 describe("host authorization at server-action boundaries", () => {
   it("lets a verified account owner manage a mic without supplying a PIN", async () => {
     mocks.accountAccess.mockResolvedValue(true)
@@ -75,5 +76,23 @@ describe("host authorization at server-action boundaries", () => {
     mocks.getUser.mockResolvedValue({ data: { user: null } })
     expect(await hostUpdateSeriesMics("comedy", "", "weekly", { name: "updated", venue: "test" })).toEqual({ success: false, error: "Unauthorized" })
     expect(mocks.calls).toEqual([])
+  })
+})
+
+describe("new mic account ownership", () => {
+  const mic = { name: "QA mic", venue: "Test venue", date: "2026-11-01", sections: [{ startTime: "19:00", slots: 1 }], notes: "", hostEmail: "", slug: "qa-new-mic", owner_user_id: "client-injected-user" }
+  it("automatically attaches a new mic to the verified account", async () => {
+    mocks.getUser.mockResolvedValue({ data: { user: { id: "verified-owner" } } })
+    mocks.single.mockResolvedValueOnce({ data: { id: "mic-1" } }).mockResolvedValueOnce({ data: { id: "section-1" } })
+    mocks.results.push({ error: null })
+    expect((await createMic(mic)).success).toBe(true)
+    expect(mocks.inserts.find(item => item.table === "mics")?.value).toMatchObject({ owner_user_id: "verified-owner" })
+  })
+  it("keeps guest mics unclaimed and ignores injected ownership", async () => {
+    mocks.getUser.mockResolvedValue({ data: { user: null } })
+    mocks.single.mockResolvedValueOnce({ data: { id: "mic-1" } }).mockResolvedValueOnce({ data: { id: "section-1" } })
+    mocks.results.push({ error: null })
+    expect((await createMic(mic)).success).toBe(true)
+    expect(mocks.inserts.find(item => item.table === "mics")?.value).toMatchObject({ owner_user_id: null })
   })
 })
